@@ -136,24 +136,19 @@ export default function OpenClawDashboard() {
     setSending(true);
 
     try {
-      // Send via the webhook endpoint — mimics receiving a "user" message
-      const res = await fetch(`${API_URL}/api/openclaw/webhook`, {
+      const res = await fetch(`${API_URL}/api/admin/chat`, {
         method: "POST",
         headers: HEADERS,
-        body: JSON.stringify({
-          candidateId: "dashboard-chat",
-          phone: "dashboard",
-          message: text,
-          candidateData: { nombre: "Admin", fase: "chat" },
-        }),
+        body: JSON.stringify({ message: text, sessionId: "dashboard-chat" }),
       });
 
-      if (res.ok) {
-        const data = await res.json();
-        const reply = data?.reply || data?.message || "✓ Mensaje recibido por OpenClaw";
-        setMessages((prev) => [...prev, { role: "agent", content: reply, ts: new Date() }]);
+      const data = await res.json();
+
+      if (res.ok && data.reply) {
+        setMessages((prev) => [...prev, { role: "agent", content: data.reply, ts: new Date() }]);
       } else {
-        setMessages((prev) => [...prev, { role: "agent", content: "⚠️ El agente no respondió (status " + res.status + ")", ts: new Date() }]);
+        const errMsg = data?.error || `Error ${res.status}`;
+        setMessages((prev) => [...prev, { role: "agent", content: `⚠️ ${errMsg}`, ts: new Date() }]);
       }
     } catch {
       setMessages((prev) => [...prev, { role: "agent", content: "⚠️ Sin conexión con el VPS", ts: new Date() }]);
