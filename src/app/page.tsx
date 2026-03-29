@@ -18,6 +18,9 @@ import {
   Trash2,
   X,
   Radio,
+  FileText,
+  Save,
+  RefreshCw,
 } from "lucide-react";
 
 const API_URL = "/api/vps";
@@ -70,6 +73,12 @@ export default function OpenClawDashboard() {
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
 
+  // System Prompt
+  const [prompt, setPrompt] = useState("");
+  const [promptLoading, setPromptLoading] = useState(false);
+  const [promptSaving, setPromptSaving] = useState(false);
+  const [promptSaved, setPromptSaved] = useState(false);
+
   // ── VPS Health Check ─────────────────────────────────────────────────────
   useEffect(() => {
     const checkStats = async () => {
@@ -109,6 +118,9 @@ export default function OpenClawDashboard() {
       setMessages(parsed.map((m: ChatMessage & { ts: string }) => ({ ...m, ts: new Date(m.ts) })));
     }
     setMessagesLoaded(true);
+
+    // Cargar prompt del VPS
+    loadPrompt();
   }, []);
 
   // ── Chat scroll + persist messages ─────────────────────────────────────
@@ -131,6 +143,30 @@ export default function OpenClawDashboard() {
   const clearChat = () => {
     setMessages([]);
     localStorage.removeItem("openclaw_messages");
+  };
+
+  const loadPrompt = async () => {
+    setPromptLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/prompt`, { headers: HEADERS });
+      const data = await res.json();
+      if (data.status === "success") setPrompt(data.data.prompt);
+    } catch { /* ignore */ }
+    setPromptLoading(false);
+  };
+
+  const savePrompt = async () => {
+    setPromptSaving(true);
+    try {
+      await fetch(`${API_URL}/api/admin/prompt`, {
+        method: "PUT",
+        headers: HEADERS,
+        body: JSON.stringify({ prompt }),
+      });
+      setPromptSaved(true);
+      setTimeout(() => setPromptSaved(false), 3000);
+    } catch { /* ignore */ }
+    setPromptSaving(false);
   };
 
   const addChannel = () => {
@@ -553,6 +589,67 @@ export default function OpenClawDashboard() {
             </div>
           </section>
         </div>
+
+        {/* ── System Prompt Editor ── */}
+        <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+          <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between">
+            <div>
+              <h2 className="text-white font-bold text-base flex items-center gap-2">
+                <FileText size={18} className="text-amber-400" /> System Prompt
+              </h2>
+              <p className="text-xs text-slate-500 mt-1">Instrucciones base de OpenClaw — se aplican en tiempo real</p>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                onClick={loadPrompt}
+                disabled={promptLoading}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 rounded-lg text-xs font-bold transition-all"
+              >
+                <RefreshCw size={13} className={promptLoading ? "animate-spin" : ""} />
+                Recargar
+              </button>
+              <button
+                onClick={savePrompt}
+                disabled={promptSaving || vpsStatus !== "online"}
+                className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all border ${
+                  promptSaved
+                    ? "bg-emerald-500/20 border-emerald-500/30 text-emerald-400"
+                    : "bg-amber-500/15 hover:bg-amber-500/25 border-amber-500/25 text-amber-300"
+                }`}
+              >
+                {promptSaving ? (
+                  <Loader2 size={13} className="animate-spin" />
+                ) : promptSaved ? (
+                  <CheckCircle2 size={13} />
+                ) : (
+                  <Save size={13} />
+                )}
+                {promptSaved ? "¡Guardado!" : "Guardar"}
+              </button>
+            </div>
+          </div>
+          <div className="p-5">
+            {promptLoading ? (
+              <div className="flex items-center justify-center h-32 text-slate-600 gap-2">
+                <Loader2 size={18} className="animate-spin" />
+                <span className="text-sm">Cargando prompt desde el VPS...</span>
+              </div>
+            ) : (
+              <textarea
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+                rows={12}
+                placeholder="Escribe aquí las instrucciones del agente..."
+                className="w-full bg-black/40 border border-white/8 focus:border-amber-500/30 outline-none text-sm text-slate-200 placeholder-slate-600 px-4 py-3 rounded-xl transition-colors font-mono leading-relaxed resize-y"
+              />
+            )}
+            <p className="text-[11px] text-slate-600 mt-2 flex items-center gap-1">
+              <FileText size={10} />
+              Guardado en <span className="font-mono text-slate-500">workspace/AGENTS.md</span> · Cambios en tiempo real sin reiniciar el servidor
+            </p>
+          </div>
+        </section>
+
       </div>
     </div>
   );
