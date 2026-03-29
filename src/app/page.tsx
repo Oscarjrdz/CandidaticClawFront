@@ -1,342 +1,430 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from "react";
-import { 
-  Activity, 
-  Terminal, 
-  Play, 
-  Square, 
-  Cpu, 
-  Network, 
-  MessageCircle, 
-  Send, 
-  Webhook, 
+import {
+  Activity,
+  Network,
+  MessageCircle,
+  Send,
+  Webhook,
   Plus,
   Zap,
-  Globe,
-  MoreVertical,
   CheckCircle2,
-  Plug
+  XCircle,
+  Loader2,
+  ChevronRight,
+  Bot,
+  User,
+  Trash2,
+  X,
 } from "lucide-react";
 
-export default function DashboardPage() {
-  const [stats, setStats] = useState({ 
-    agentActive: true, 
-    inferences: 140592, 
-    activeChannels: 3, 
-    avgLatency: 240 
-  });
-  
-  const [logs, setLogs] = useState<any[]>([]);
-  const terminalEndRef = useRef<HTMLDivElement>(null);
+const API_URL = "/api/vps";
+const API_KEY = process.env.NEXT_PUBLIC_VPS_API_KEY || "super_secret_key_123";
+const HEADERS = { "Content-Type": "application/json", "x-api-key": API_KEY };
 
-  // Mocks para canales
-  const [channels, setChannels] = useState([
-    { id: 1, type: "whatsapp", name: "WhatsApp Business API", status: "connected", events: 12503 },
-    { id: 2, type: "telegram", name: "Telegram Bot (Prod)", status: "connected", events: 4320 },
-    { id: 3, type: "webhook", name: "Internal ERP Sync", status: "degraded", events: 890 }
-  ]);
+// ─── Types ───────────────────────────────────────────────────────────────────
 
+interface VpsStats {
+  agentActive: boolean;
+  activeConversations: number;
+  messagesToday: number;
+  candidatesTransferred: number;
+}
+
+interface Channel {
+  id: string;
+  type: "whatsapp" | "telegram" | "webhook";
+  name: string;
+  endpoint: string;
+  createdAt: string;
+}
+
+interface ChatMessage {
+  role: "user" | "agent";
+  content: string;
+  ts: Date;
+}
+
+// ─── Main Component ───────────────────────────────────────────────────────────
+
+export default function OpenClawDashboard() {
+  // VPS Status
+  const [vpsStatus, setVpsStatus] = useState<"loading" | "online" | "offline">("loading");
+  const [stats, setStats] = useState<VpsStats | null>(null);
+
+  // Channels
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [showNewChannel, setShowNewChannel] = useState(false);
+  const [newChannel, setNewChannel] = useState({ type: "whatsapp" as Channel["type"], name: "", endpoint: "" });
+  const [savingChannel, setSavingChannel] = useState(false);
+
+  // Chat
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [input, setInput] = useState("");
+  const [sending, setSending] = useState(false);
+  const chatEndRef = useRef<HTMLDivElement>(null);
+
+  // ── VPS Health Check ─────────────────────────────────────────────────────
   useEffect(() => {
-    // Simulated log stream
-    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
-    const generateId = () => Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-    
-    const interval = setInterval(() => {
-      if (!stats.agentActive) return;
-      const types = ['info', 'sys', 'thinking', 'success', 'sys'];
-      const messages = [
-        "Incoming webhook payload from WhatsApp API",
-        "NLP Routing decided node: SALES_INQUIRY",
-        "Generating response chunk stream via LLM...",
-        "Memory vector retrieved: ID-" + generateId(),
-        "Message delivered to channel (+52 ** ****)",
-        "Database sync completed in 14ms",
-        "Agent inference cycle completed (204ms latency)",
-        "Spawning child-process for heavy data aggregation..."
-      ];
-      
-      const type = types[Math.floor(Math.random() * types.length)];
-      const newLog = {
-        timestamp: new Date().toISOString(),
-        type: type,
-        message: messages[Math.floor(Math.random() * messages.length)],
-        id: generateId()
-      };
-      
-      setLogs((prev: any[]) => {
-        const next = [...prev, newLog];
-        return next.length > 50 ? next.slice(next.length - 50) : next;
-      });
-    }, 1200);
+    const checkStats = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/admin/stats`, { headers: HEADERS });
+        if (!res.ok) throw new Error();
+        const data = await res.json();
+        if (data.status === "success") {
+          setStats(data.data);
+          setVpsStatus("online");
+        } else {
+          setVpsStatus("offline");
+        }
+      } catch {
+        setVpsStatus("offline");
+        setStats(null);
+      }
+    };
 
+    checkStats();
+    const interval = setInterval(checkStats, 15000); // ping every 15s
     return () => clearInterval(interval);
-  }, [stats.agentActive]);
+  }, []);
 
+  // ── Load channels from localStorage (persisted locally) ──────────────────
   useEffect(() => {
-    terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [logs]);
+    const saved = localStorage.getItem("openclaw_channels");
+    if (saved) setChannels(JSON.parse(saved));
+  }, []);
 
-  const toggleAgent = (start: boolean) => {
-    setStats((prev: any) => ({ ...prev, agentActive: start }));
+  // ── Chat scroll ───────────────────────────────────────────────────────────
+  useEffect(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages]);
+
+  // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const addChannel = () => {
+    if (!newChannel.name.trim() || !newChannel.endpoint.trim()) return;
+    setSavingChannel(true);
+    const ch: Channel = {
+      id: Date.now().toString(),
+      type: newChannel.type,
+      name: newChannel.name.trim(),
+      endpoint: newChannel.endpoint.trim(),
+      createdAt: new Date().toISOString(),
+    };
+    const updated = [...channels, ch];
+    setChannels(updated);
+    localStorage.setItem("openclaw_channels", JSON.stringify(updated));
+    setNewChannel({ type: "whatsapp", name: "", endpoint: "" });
+    setShowNewChannel(false);
+    setSavingChannel(false);
   };
 
-  const getLogStyle = (type: string) => {
-    switch(type) {
-      case 'sys': return 'text-orange-500 font-bold';
-      case 'thinking': return 'text-amber-300 italic';
-      case 'success': return 'text-emerald-400';
-      case 'info': return 'text-cyan-400';
-      default: return 'text-slate-300';
+  const removeChannel = (id: string) => {
+    const updated = channels.filter((c) => c.id !== id);
+    setChannels(updated);
+    localStorage.setItem("openclaw_channels", JSON.stringify(updated));
+  };
+
+  const sendMessage = async () => {
+    const text = input.trim();
+    if (!text || sending) return;
+    setInput("");
+
+    const userMsg: ChatMessage = { role: "user", content: text, ts: new Date() };
+    setMessages((prev) => [...prev, userMsg]);
+    setSending(true);
+
+    try {
+      // Send via the webhook endpoint — mimics receiving a "user" message
+      const res = await fetch(`${API_URL}/api/openclaw/webhook`, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({
+          candidateId: "dashboard-chat",
+          phone: "dashboard",
+          message: text,
+          candidateData: { nombre: "Admin", fase: "chat" },
+        }),
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        const reply = data?.reply || data?.message || "✓ Mensaje recibido por OpenClaw";
+        setMessages((prev) => [...prev, { role: "agent", content: reply, ts: new Date() }]);
+      } else {
+        setMessages((prev) => [...prev, { role: "agent", content: "⚠️ El agente no respondió (status " + res.status + ")", ts: new Date() }]);
+      }
+    } catch {
+      setMessages((prev) => [...prev, { role: "agent", content: "⚠️ Sin conexión con el VPS", ts: new Date() }]);
+    } finally {
+      setSending(false);
     }
   };
 
-  return (
-    <div className="min-h-screen bg-[#050505] p-6 md:p-8 font-sans selection:bg-orange-500/30 text-slate-300 relative overflow-hidden">
-      {/* Background Glow */}
-      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none"></div>
-      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-rose-600/10 blur-[120px] rounded-full pointer-events-none"></div>
-      <div className="absolute top-[20%] right-[30%] w-[30%] h-[30%] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+  const channelIcon = (type: Channel["type"]) => {
+    if (type === "whatsapp") return <MessageCircle size={20} className="text-emerald-400" />;
+    if (type === "telegram") return <Send size={20} className="text-sky-400" />;
+    return <Webhook size={20} className="text-rose-400" />;
+  };
 
-      <div className="max-w-[1400px] mx-auto space-y-8 relative z-10">
-        
-        {/* Cabecera OpenClaw */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
+  const channelBg = (type: Channel["type"]) => {
+    if (type === "whatsapp") return "bg-emerald-500/10 border-emerald-500/20";
+    if (type === "telegram") return "bg-sky-500/10 border-sky-500/20";
+    return "bg-rose-500/10 border-rose-500/20";
+  };
+
+  return (
+    <div className="min-h-screen bg-[#050505] text-slate-200 font-sans p-5 md:p-8 relative overflow-hidden selection:bg-orange-500/30">
+      {/* Ambient glows */}
+      <div className="fixed top-[-15%] left-[-10%] w-[45%] h-[45%] bg-orange-600/8 blur-[140px] rounded-full pointer-events-none" />
+      <div className="fixed bottom-[-15%] right-[-10%] w-[40%] h-[40%] bg-purple-700/8 blur-[140px] rounded-full pointer-events-none" />
+
+      <div className="max-w-[1280px] mx-auto space-y-7 relative z-10">
+
+        {/* ── Header ── */}
+        <header className="flex items-center justify-between border-b border-white/5 pb-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-orange-500 via-rose-500 to-purple-600 rounded-xl shadow-[0_0_30px_rgba(249,115,22,0.3)] relative group">
-              <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
-              <Network className="text-white relative z-10" size={32} />
+            <div className="p-2.5 bg-gradient-to-br from-orange-500 via-rose-500 to-purple-600 rounded-xl shadow-[0_0_25px_rgba(249,115,22,0.25)]">
+              <Network size={28} className="text-white" />
             </div>
             <div>
-              <h1 className="text-3xl md:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-rose-500 to-purple-500 tracking-tight">
+              <h1 className="text-2xl md:text-3xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-rose-500 to-purple-400 tracking-tight">
                 OpenClaw OS
               </h1>
-              <p className="text-slate-400 text-sm font-medium mt-1 tracking-wide uppercase">Global Neural Orchestration Platform</p>
+              <p className="text-[11px] text-slate-500 uppercase tracking-widest mt-0.5 font-semibold">Neural Orchestration Platform</p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-4">
-            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-lg border border-white/10 text-sm text-slate-300 backdrop-blur-sm">
-              <Globe size={16} className="text-emerald-500" />
-              <span>Network: <strong className="text-white">Global Edge Node</strong></span>
-            </div>
 
-            <div className="flex bg-black/40 rounded-lg p-1 border border-white/10 backdrop-blur-md">
-              <button onClick={() => toggleAgent(true)} className={`flex items-center gap-2 px-5 py-2.5 rounded-md transition-all text-sm font-bold tracking-wider ${stats.agentActive ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.2)]' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}>
-                <Play size={14} fill={stats.agentActive ? "currentColor" : "none"} /> ENGINE ONLINE
-              </button>
-              <button onClick={() => toggleAgent(false)} className={`flex items-center gap-2 px-5 py-2.5 rounded-md transition-all text-sm font-bold tracking-wider ${!stats.agentActive ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.2)]' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}>
-                <Square size={14} fill={!stats.agentActive ? "currentColor" : "none"} /> HALT
-              </button>
-            </div>
+          {/* VPS Status Pill */}
+          <div className={`flex items-center gap-2.5 px-4 py-2 rounded-full border text-sm font-semibold transition-all ${
+            vpsStatus === "online"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : vpsStatus === "offline"
+              ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+              : "bg-slate-500/10 border-slate-500/20 text-slate-400"
+          }`}>
+            {vpsStatus === "loading" && <Loader2 size={15} className="animate-spin" />}
+            {vpsStatus === "online" && (
+              <span className="relative flex h-2.5 w-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-500" />
+              </span>
+            )}
+            {vpsStatus === "offline" && <XCircle size={15} />}
+            {vpsStatus === "loading" ? "Conectando..." : vpsStatus === "online" ? "VPS Online" : "VPS Offline"}
           </div>
         </header>
 
-        {/* Global Metricas */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-          <MetricCard 
-            title="Core Node Logic" 
-            value={stats.agentActive ? "Running" : "Suspended"} 
-            subtitle="Real-time multi-agent processing"
-            icon={<Activity size={20} />} 
-            color="orange"
-            pulse={stats.agentActive}
-          />
-          <MetricCard 
-            title="Total Inferences" 
-            value={stats.inferences.toLocaleString()} 
-            subtitle="LLM compute tasks in 24h"
-            icon={<Cpu size={20} />} 
-            color="cyan"
-          />
-          <MetricCard 
-            title="Active Endpoints" 
-            value={stats.activeChannels} 
-            subtitle="Connected IO channels streams"
-            icon={<Network size={20} />} 
-            color="purple"
-          />
-          <MetricCard 
-            title="Global Latency" 
-            value={`${stats.avgLatency}ms`} 
-            subtitle="End-to-end routing time"
-            icon={<Zap size={20} />} 
-            color="emerald"
-          />
-        </div>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[600px]">
-          
-          {/* Live System Stream (Left - 2cols) */}
-          <div className="lg:col-span-2 bg-[#0a0a0a]/80 backdrop-blur-xl rounded-3xl flex flex-col h-[600px] lg:h-full border border-white/5 shadow-2xl relative overflow-hidden group">
-            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-orange-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
-            
-            <div className="bg-black/50 px-6 py-5 flex justify-between items-center border-b border-white/5">
-              <h2 className="text-white font-mono text-sm tracking-widest flex items-center gap-3 font-semibold uppercase">
-                <Terminal size={18} className="text-orange-500" /> System.Stream_Log
-              </h2>
-              <div className="flex gap-3 items-center">
-                <span className="flex h-2.5 w-2.5 relative">
-                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${stats.agentActive ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
-                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${stats.agentActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
-                </span>
-                <span className="text-xs font-mono text-slate-500">{stats.agentActive ? 'Live feed connected' : 'Feed paused'}</span>
+        {/* ── Stats row (only when online) ── */}
+        {vpsStatus === "online" && stats && (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            {[
+              { label: "Estado", value: stats.agentActive ? "Activo" : "Inactivo", color: stats.agentActive ? "text-emerald-400" : "text-rose-400", icon: <Activity size={18} /> },
+              { label: "Conversaciones", value: stats.activeConversations, color: "text-orange-400", icon: <MessageCircle size={18} /> },
+              { label: "Mensajes Hoy", value: stats.messagesToday, color: "text-cyan-400", icon: <Zap size={18} /> },
+              { label: "Transferidos", value: stats.candidatesTransferred, color: "text-purple-400", icon: <CheckCircle2 size={18} /> },
+            ].map((s) => (
+              <div key={s.label} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 hover:border-white/10 transition-all">
+                <div className={`${s.color} opacity-80`}>{s.icon}</div>
+                <div>
+                  <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{s.label}</p>
+                  <p className={`text-xl font-black ${s.color} mt-0.5`}>{s.value}</p>
+                </div>
               </div>
+            ))}
+          </div>
+        )}
+
+        {/* ── Main 2-col grid ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          {/* ── Channel Manager ── */}
+          <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden flex flex-col shadow-2xl">
+            <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-black/30">
+              <div>
+                <h2 className="text-white font-bold text-base flex items-center gap-2">
+                  <Webhook size={18} className="text-purple-400" /> Canales IO
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Endpoints conectados a OpenClaw</p>
+              </div>
+              <button
+                onClick={() => setShowNewChannel(!showNewChannel)}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/25 text-purple-300 rounded-lg text-xs font-bold transition-all hover:scale-105 active:scale-95"
+              >
+                <Plus size={15} /> Nuevo
+              </button>
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-6 font-mono text-[13.5px] leading-relaxed terminal-scroll space-y-3">
-              {logs.length === 0 ? (
-                <div className="flex items-center gap-3 text-slate-500 pt-4">
-                  <Activity size={18} className="animate-pulse" />
-                  <p>Initializing OpenClaw Neural Core...</p>
+
+            {/* New channel form */}
+            {showNewChannel && (
+              <div className="px-6 py-5 border-b border-white/5 bg-purple-900/5 space-y-3">
+                <div className="flex gap-2">
+                  {(["whatsapp", "telegram", "webhook"] as Channel["type"][]).map((t) => (
+                    <button
+                      key={t}
+                      onClick={() => setNewChannel((p) => ({ ...p, type: t }))}
+                      className={`flex-1 py-2 rounded-lg text-xs font-bold capitalize transition-all border ${
+                        newChannel.type === t
+                          ? "bg-purple-500/20 border-purple-500/50 text-purple-300"
+                          : "bg-white/5 border-white/5 text-slate-400 hover:border-white/15"
+                      }`}
+                    >
+                      {t}
+                    </button>
+                  ))}
+                </div>
+                <input
+                  value={newChannel.name}
+                  onChange={(e) => setNewChannel((p) => ({ ...p, name: e.target.value }))}
+                  placeholder="Nombre del canal (ej: Ventas WA)"
+                  className="w-full bg-black/40 border border-white/10 focus:border-purple-500/40 outline-none text-sm text-white placeholder-slate-600 px-4 py-2.5 rounded-xl transition-colors"
+                />
+                <input
+                  value={newChannel.endpoint}
+                  onChange={(e) => setNewChannel((p) => ({ ...p, endpoint: e.target.value }))}
+                  placeholder="Endpoint / Token / Phone ID"
+                  className="w-full bg-black/40 border border-white/10 focus:border-purple-500/40 outline-none text-sm text-white placeholder-slate-600 px-4 py-2.5 rounded-xl transition-colors"
+                />
+                <div className="flex gap-2">
+                  <button
+                    onClick={addChannel}
+                    disabled={savingChannel || !newChannel.name || !newChannel.endpoint}
+                    className="flex-1 py-2.5 bg-purple-500/20 hover:bg-purple-500/30 border border-purple-500/30 text-purple-300 rounded-xl text-sm font-bold transition-all disabled:opacity-40"
+                  >
+                    {savingChannel ? "Guardando..." : "Crear Canal"}
+                  </button>
+                  <button
+                    onClick={() => setShowNewChannel(false)}
+                    className="px-4 py-2.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 rounded-xl text-sm transition-all"
+                  >
+                    <X size={16} />
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Channel list */}
+            <div className="flex-1 overflow-y-auto divide-y divide-white/5">
+              {channels.length === 0 ? (
+                <div className="flex flex-col items-center justify-center py-16 text-slate-600 gap-3">
+                  <Webhook size={32} className="opacity-40" />
+                  <p className="text-sm font-medium">Sin canales configurados</p>
+                  <p className="text-xs">Haz clic en "Nuevo" para agregar uno</p>
                 </div>
               ) : (
-                logs.map((log: any, i: number) => (
-                  <div key={i} className="flex gap-4 hover:bg-white/5 p-1.5 -mx-1.5 rounded-lg transition-colors duration-200">
-                    <span className="text-slate-600/80 shrink-0 select-none">
-                      [{log.timestamp.split('T')[1].slice(0, 11)}]
-                    </span>
-                    <span className={`flex-1 break-words ${getLogStyle(log.type)}`}>
-                      {log.message}
-                    </span>
+                channels.map((ch) => (
+                  <div key={ch.id} className="flex items-center gap-4 px-6 py-4 hover:bg-white/[0.03] transition-colors group">
+                    <div className={`p-2.5 rounded-xl border ${channelBg(ch.type)}`}>
+                      {channelIcon(ch.type)}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-white truncate">{ch.name}</p>
+                      <p className="text-[11px] text-slate-500 truncate mt-0.5 font-mono">{ch.endpoint}</p>
+                    </div>
+                    <div className="flex items-center gap-3 shrink-0">
+                      <span className="text-[10px] uppercase font-bold text-emerald-400 bg-emerald-500/10 px-2 py-1 rounded-full border border-emerald-500/20">
+                        Live
+                      </span>
+                      <button
+                        onClick={() => removeChannel(ch.id)}
+                        className="text-slate-600 hover:text-rose-400 opacity-0 group-hover:opacity-100 transition-all p-1"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
                   </div>
                 ))
               )}
-              <div ref={terminalEndRef} />
             </div>
-          </div>
+          </section>
 
-          {/* Omnichannel Integrations (Right - 1col) */}
-          <div className="bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden flex flex-col h-[600px] lg:h-full relative shadow-2xl">
-            <div className="px-6 py-5 bg-black/50 border-b border-white/5 flex justify-between items-center z-10">
+          {/* ── Chat con OpenClaw ── */}
+          <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden flex flex-col shadow-2xl h-[520px]">
+            <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between shrink-0">
               <div>
-                <h2 className="text-white font-semibold text-base flex items-center gap-2 tracking-wide">
-                  <Plug size={18} className="text-purple-500" /> IO Channels Gateway
+                <h2 className="text-white font-bold text-base flex items-center gap-2">
+                  <Bot size={18} className="text-orange-400" /> Chat con OpenClaw
                 </h2>
-                <p className="text-xs text-slate-400 mt-1">Manage external endpoints & integrations</p>
+                <p className="text-xs text-slate-500 mt-1">Habla directo con tu agente</p>
               </div>
-              <button className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-xl border border-purple-500/20 transition-all hover:scale-105 active:scale-95 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
-                <Plus size={18} />
-              </button>
+              {vpsStatus === "offline" && (
+                <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-1 rounded-full border border-rose-500/20 font-bold">
+                  VPS desconectado
+                </span>
+              )}
             </div>
-            
-            <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar z-10">
-              
-              {channels.map((channel: any) => (
-                <div key={channel.id} className="group bg-white/5 border border-white/5 hover:border-purple-500/40 rounded-2xl p-5 transition-all duration-300 hover:bg-white/[0.08] cursor-pointer shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5">
-                  <div className="flex justify-between items-start mb-4">
-                    <div className="flex items-center gap-3.5">
-                      <div className={`p-3 rounded-xl shadow-inner ${
-                        channel.type === 'whatsapp' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 
-                        channel.type === 'telegram' ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20' : 
-                        'bg-rose-500/15 text-rose-400 border border-rose-500/20'
-                      }`}>
-                        {channel.type === 'whatsapp' && <MessageCircle size={22} />}
-                        {channel.type === 'telegram' && <Send size={22} />}
-                        {channel.type === 'webhook' && <Webhook size={22} />}
-                      </div>
-                      <div>
-                        <h3 className="text-sm font-bold text-white group-hover:text-purple-200 transition-colors tracking-wide">{channel.name}</h3>
-                        <p className="text-[11px] font-medium text-slate-500 capitalize mt-0.5 tracking-wider uppercase">{channel.type} Integration</p>
-                      </div>
+
+            {/* Messages */}
+            <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
+              {messages.length === 0 && (
+                <div className="flex flex-col items-center justify-center h-full text-slate-600 gap-3">
+                  <Bot size={36} className="opacity-30" />
+                  <p className="text-sm font-medium">Escribe algo para comenzar</p>
+                  <p className="text-xs">OpenClaw responderá en tiempo real</p>
+                </div>
+              )}
+              {messages.map((msg, i) => (
+                <div key={i} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
+                  {msg.role === "agent" && (
+                    <div className="p-2 bg-orange-500/15 rounded-full shrink-0 self-end border border-orange-500/20 h-fit">
+                      <Bot size={14} className="text-orange-400" />
                     </div>
-                    <button className="text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-1">
-                      <MoreVertical size={18} />
-                    </button>
+                  )}
+                  <div className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                    msg.role === "user"
+                      ? "bg-orange-500/15 border border-orange-500/20 text-orange-100 rounded-br-sm"
+                      : "bg-white/[0.06] border border-white/5 text-slate-200 rounded-bl-sm"
+                  }`}>
+                    {msg.content}
+                    <p className="text-[10px] opacity-40 mt-1.5 font-mono">
+                      {msg.ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+                    </p>
                   </div>
-                  
-                  <div className="flex justify-between items-end bg-black/20 p-3 rounded-xl border border-white/5">
-                    <div className="flex items-center gap-1.5">
-                      {channel.status === 'connected' ? (
-                        <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20">
-                          <CheckCircle2 size={12} /> Live
-                        </span>
-                      ) : (
-                        <span className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border border-amber-500/20">
-                          <Zap size={12} /> Degraded
-                        </span>
-                      )}
+                  {msg.role === "user" && (
+                    <div className="p-2 bg-slate-700/50 rounded-full shrink-0 self-end border border-white/10 h-fit">
+                      <User size={14} className="text-slate-300" />
                     </div>
-                    <div className="text-right">
-                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Payloads Data</p>
-                      <p className="text-sm font-mono font-bold text-white mt-0.5">{channel.events.toLocaleString()}</p>
-                    </div>
-                  </div>
+                  )}
                 </div>
               ))}
-
-              <button className="w-full py-6 mt-6 border-2 border-dashed border-white/10 hover:border-purple-500/50 rounded-2xl text-sm font-bold text-slate-400 hover:text-purple-300 transition-all duration-300 flex flex-col items-center justify-center gap-3 group bg-black/20 hover:bg-purple-900/10">
-                <div className="p-3 bg-white/5 group-hover:bg-purple-500/20 group-hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] rounded-full transition-all duration-300 group-hover:scale-110">
-                  <Plus size={24} className="text-slate-400 group-hover:text-purple-400" />
+              {sending && (
+                <div className="flex gap-3 justify-start">
+                  <div className="p-2 bg-orange-500/15 rounded-full shrink-0 self-end border border-orange-500/20">
+                    <Bot size={14} className="text-orange-400" />
+                  </div>
+                  <div className="bg-white/[0.06] border border-white/5 rounded-2xl rounded-bl-sm px-4 py-3 flex gap-1.5 items-center">
+                    <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "0ms" }} />
+                    <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "150ms" }} />
+                    <span className="w-1.5 h-1.5 bg-orange-400 rounded-full animate-bounce" style={{ animationDelay: "300ms" }} />
+                  </div>
                 </div>
-                Deploy New Channel
-              </button>
-              
+              )}
+              <div ref={chatEndRef} />
             </div>
-            
-            {/* Bottom Edge Fade */}
-            <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-[#0a0a0a] to-transparent pointer-events-none z-20"></div>
-          </div>
-          
+
+            {/* Input */}
+            <div className="px-4 py-4 border-t border-white/5 bg-black/20 shrink-0">
+              <div className="flex gap-2">
+                <input
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                  disabled={vpsStatus !== "online"}
+                  placeholder={vpsStatus === "online" ? "Escribe a OpenClaw..." : "VPS desconectado"}
+                  className="flex-1 bg-white/5 border border-white/10 focus:border-orange-500/40 outline-none text-sm text-white placeholder-slate-600 px-4 py-3 rounded-xl transition-colors disabled:opacity-40"
+                />
+                <button
+                  onClick={sendMessage}
+                  disabled={sending || !input.trim() || vpsStatus !== "online"}
+                  className="px-4 py-3 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 text-orange-400 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100"
+                >
+                  {sending ? <Loader2 size={18} className="animate-spin" /> : <ChevronRight size={18} />}
+                </button>
+              </div>
+            </div>
+          </section>
         </div>
-      </div>
-      
-      {/* Dynamic Global Styles for Scrollbars */}
-      <style dangerouslySetInnerHTML={{__html: `
-        .terminal-scroll::-webkit-scrollbar { width: 6px; }
-        .terminal-scroll::-webkit-scrollbar-track { background: transparent; }
-        .terminal-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
-        .terminal-scroll::-webkit-scrollbar-thumb:hover { background: #555; }
-        
-        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.2); border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.4); }
-      `}} />
-    </div>
-  );
-}
-
-function MetricCard({ title, value, subtitle, icon, color, pulse = false }: any) {
-  const colorMap: Record<string, string> = {
-    orange: "from-orange-500/20 to-orange-500/5 text-orange-500 border-orange-500/20",
-    cyan: "from-cyan-500/20 to-cyan-500/5 text-cyan-500 border-cyan-500/20",
-    purple: "from-purple-500/20 to-purple-500/5 text-purple-500 border-purple-500/20",
-    emerald: "from-emerald-500/20 to-emerald-500/5 text-emerald-500 border-emerald-500/20",
-    rose: "from-rose-500/20 to-rose-500/5 text-rose-500 border-rose-500/20",
-  };
-
-  const ringMap: Record<string, string> = {
-    orange: "shadow-[0_0_15px_rgba(249,115,22,0.6)] bg-orange-500",
-    cyan: "shadow-[0_0_15px_rgba(6,182,212,0.6)] bg-cyan-500",
-    purple: "shadow-[0_0_15px_rgba(168,85,247,0.6)] bg-purple-500",
-    emerald: "shadow-[0_0_15px_rgba(16,185,129,0.6)] bg-emerald-500",
-    rose: "shadow-[0_0_15px_rgba(244,63,94,0.6)] bg-rose-500",
-  };
-
-  return (
-    <div className="bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/5 p-6 rounded-3xl flex flex-col justify-between hover:border-white/10 transition-all duration-300 group relative overflow-hidden shadow-lg hover:-translate-y-1">
-      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${colorMap[color]} blur-3xl rounded-full opacity-0 group-hover:opacity-40 transition-opacity duration-500 pointer-events-none`}></div>
-      <div className={`absolute -bottom-10 -left-10 w-32 h-32 bg-gradient-to-tr ${colorMap[color]} blur-3xl rounded-full opacity-10 group-hover:opacity-30 transition-opacity duration-500 pointer-events-none`}></div>
-      
-      <div className="flex justify-between items-start z-10">
-        <div className={`p-4 rounded-2xl bg-gradient-to-br ${colorMap[color]} bg-black shadow-inner`}>
-          {icon}
-        </div>
-        {pulse && (
-          <div className="pt-2 pr-2">
-            <span className="flex h-3 w-3 relative">
-              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${ringMap[color]}`}></span>
-              <span className={`relative inline-flex rounded-full h-3 w-3 ${ringMap[color]}`}></span>
-            </span>
-          </div>
-        )}
-      </div>
-      
-      <div className="mt-6 z-10">
-        <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">{title}</p>
-        <p className="text-3xl font-black text-white mt-1.5 tracking-tight">{value}</p>
-        <p className="text-xs text-slate-500 mt-2 font-medium">{subtitle}</p>
       </div>
     </div>
   );
