@@ -1,210 +1,202 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
-import { Activity, Terminal, Users, Play, Square, MessageSquare, Save, CheckCircle2, Cpu, Database, ChevronDown, Network, Settings } from "lucide-react";
-
-const API_URL = "/api/vps";
-const API_KEY = process.env.NEXT_PUBLIC_VPS_API_KEY || "super_secret_key_123";
+import React, { useState, useEffect, useRef } from "react";
+import { 
+  Activity, 
+  Terminal, 
+  Play, 
+  Square, 
+  Cpu, 
+  Network, 
+  MessageCircle, 
+  Send, 
+  Webhook, 
+  Plus,
+  Zap,
+  Globe,
+  MoreVertical,
+  CheckCircle2,
+  Plug
+} from "lucide-react";
 
 export default function DashboardPage() {
-  const [stats, setStats] = useState({ agentActive: false, activeConversations: 0, messagesToday: 0, candidatesTransferred: 0 });
-  const [conversations, setConversations] = useState<any[]>([]);
+  const [stats, setStats] = useState({ 
+    agentActive: true, 
+    inferences: 140592, 
+    activeChannels: 3, 
+    avgLatency: 240 
+  });
+  
   const [logs, setLogs] = useState<any[]>([]);
-  const [promptContent, setPromptContent] = useState("");
-  const [savingPrompt, setSavingPrompt] = useState(false);
-  const [activeProject, setActiveProject] = useState("Candidatic CRM");
   const terminalEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    fetchStats();
-    fetchConversations();
-    fetchPrompt();
+  // Mocks para canales
+  const [channels, setChannels] = useState([
+    { id: 1, type: "whatsapp", name: "WhatsApp Business API", status: "connected", events: 12503 },
+    { id: 2, type: "telegram", name: "Telegram Bot (Prod)", status: "connected", events: 4320 },
+    { id: 3, type: "webhook", name: "Internal ERP Sync", status: "degraded", events: 890 }
+  ]);
 
-    const eventSource = new EventSource(`${API_URL}/api/admin/feed?token=${API_KEY}`);
+  useEffect(() => {
+    // Simulated log stream
+    const chars = "abcdefghijklmnopqrstuvwxyz0123456789";
+    const generateId = () => Array.from({length: 8}, () => chars[Math.floor(Math.random() * chars.length)]).join('');
     
-    eventSource.onmessage = (event) => {
-      try {
-        const data = JSON.parse(event.data);
-        setLogs((prev) => [...prev, data]);
-      } catch (e) {
-        console.error("Error parseando SSE:", e);
-      }
-    };
-    return () => eventSource.close();
-  }, []);
+    const interval = setInterval(() => {
+      if (!stats.agentActive) return;
+      const types = ['info', 'sys', 'thinking', 'success', 'sys'];
+      const messages = [
+        "Incoming webhook payload from WhatsApp API",
+        "NLP Routing decided node: SALES_INQUIRY",
+        "Generating response chunk stream via LLM...",
+        "Memory vector retrieved: ID-" + generateId(),
+        "Message delivered to channel (+52 ** ****)",
+        "Database sync completed in 14ms",
+        "Agent inference cycle completed (204ms latency)",
+        "Spawning child-process for heavy data aggregation..."
+      ];
+      
+      const type = types[Math.floor(Math.random() * types.length)];
+      const newLog = {
+        timestamp: new Date().toISOString(),
+        type: type,
+        message: messages[Math.floor(Math.random() * messages.length)],
+        id: generateId()
+      };
+      
+      setLogs((prev: any[]) => {
+        const next = [...prev, newLog];
+        return next.length > 50 ? next.slice(next.length - 50) : next;
+      });
+    }, 1200);
+
+    return () => clearInterval(interval);
+  }, [stats.agentActive]);
 
   useEffect(() => {
     terminalEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [logs]);
 
-  const headers = { "Content-Type": "application/json", "x-api-key": API_KEY };
-
-  const fetchStats = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/stats`, { headers });
-      const data = await res.json();
-      if (data.status === "success") setStats(data.data);
-    } catch (e) { console.error("Error stats", e); }
+  const toggleAgent = (start: boolean) => {
+    setStats((prev: any) => ({ ...prev, agentActive: start }));
   };
 
-  const fetchConversations = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/conversations`, { headers });
-      const data = await res.json();
-      if (data.status === "success") setConversations(data.data);
-    } catch (e) { console.error("Error conv", e); }
-  };
-
-  const fetchPrompt = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/prompt`, { headers });
-      const data = await res.json();
-      if (data.status === "success") setPromptContent(data.data.prompt);
-    } catch (e) { console.error("Error prompt", e); }
-  };
-
-  const toggleAgent = async (start: boolean) => {
-    const endpoint = start ? "start" : "stop";
-    try {
-      await fetch(`${API_URL}/api/admin/${endpoint}`, { method: "POST", headers });
-      fetchStats();
-    } catch (e) { console.error("Error toggle", e); }
-  };
-
-  const savePrompt = async () => {
-    setSavingPrompt(true);
-    try {
-      await fetch(`${API_URL}/api/admin/prompt`, {
-        method: "PUT", headers, body: JSON.stringify({ prompt: promptContent })
-      });
-    } catch (e) {
-      console.error("Error save prompt", e);
-    } finally {
-      setTimeout(() => setSavingPrompt(false), 1000);
+  const getLogStyle = (type: string) => {
+    switch(type) {
+      case 'sys': return 'text-orange-500 font-bold';
+      case 'thinking': return 'text-amber-300 italic';
+      case 'success': return 'text-emerald-400';
+      case 'info': return 'text-cyan-400';
+      default: return 'text-slate-300';
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    if (status === 'Analizando') return <span className="bg-cyan-500/20 text-cyan-400 px-3 py-1 rounded-full text-xs flex items-center gap-1"><Cpu size={12}/> Processing</span>;
-    if (status === 'Esperando Respuesta') return <span className="bg-orange-500/20 text-orange-400 px-3 py-1 rounded-full text-xs flex items-center gap-1"><MessageSquare size={12}/> Awaiting Input</span>;
-    return <span className="bg-rose-500/20 text-rose-400 px-3 py-1 rounded-full text-xs flex items-center gap-1"><CheckCircle2 size={12}/> Handled</span>;
-  };
-
-  const getLogColor = (type: string, level: string) => {
-    if (type === 'sys') return 'text-orange-500 font-bold';
-    if (level === 'thinking') return 'text-amber-300 italic';
-    if (level === 'info') return 'text-cyan-400';
-    return 'text-slate-300';
-  };
-
   return (
-    <div className="min-h-screen bg-[#0a0a0a] p-6 md:p-8 font-sans selection:bg-orange-500/30 text-slate-300">
-      <div className="max-w-7xl mx-auto space-y-8">
+    <div className="min-h-screen bg-[#050505] p-6 md:p-8 font-sans selection:bg-orange-500/30 text-slate-300 relative overflow-hidden">
+      {/* Background Glow */}
+      <div className="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-orange-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+      <div className="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-rose-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+      <div className="absolute top-[20%] right-[30%] w-[30%] h-[30%] bg-purple-600/10 blur-[120px] rounded-full pointer-events-none"></div>
+
+      <div className="max-w-[1400px] mx-auto space-y-8 relative z-10">
         
         {/* Cabecera OpenClaw */}
-        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-orange-900/30 pb-6">
+        <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-white/5 pb-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-gradient-to-br from-orange-600 to-rose-600 rounded-xl shadow-[0_0_20px_rgba(234,88,12,0.3)]">
-              <Network className="text-white" size={32} />
+            <div className="p-3 bg-gradient-to-br from-orange-500 via-rose-500 to-purple-600 rounded-xl shadow-[0_0_30px_rgba(249,115,22,0.3)] relative group">
+              <div className="absolute inset-0 bg-white/20 rounded-xl opacity-0 group-hover:opacity-100 transition-opacity"></div>
+              <Network className="text-white relative z-10" size={32} />
             </div>
             <div>
-              <h1 className="text-3xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 to-rose-500 tracking-tight">
-                OpenClaw
+              <h1 className="text-3xl md:text-4xl font-extrabold bg-clip-text text-transparent bg-gradient-to-r from-orange-400 via-rose-500 to-purple-500 tracking-tight">
+                OpenClaw OS
               </h1>
-              <p className="text-orange-500/70 text-sm font-medium tracking-widest uppercase mt-1">Autonomous Orchestration Node</p>
+              <p className="text-slate-400 text-sm font-medium mt-1 tracking-wide uppercase">Global Neural Orchestration Platform</p>
             </div>
           </div>
           
           <div className="flex items-center gap-4">
-            {/* Project Selector - Simulado */}
-            <div className="relative group z-50">
-              <button className="flex items-center gap-2 bg-[#141414] border border-orange-900/40 hover:border-orange-500/50 px-4 py-2 rounded-lg transition-all text-sm">
-                <Database size={16} className="text-orange-500" />
-                <span>Tenant: <strong className="text-white">{activeProject}</strong></span>
-                <ChevronDown size={14} className="text-slate-500" />
-              </button>
-              <div className="absolute right-0 top-full mt-2 w-48 bg-[#141414] border border-orange-900/40 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all overflow-hidden">
-                <div className="p-2">
-                  <button onClick={() => setActiveProject("Candidatic CRM")} className="w-full text-left px-3 py-2 text-sm hover:bg-orange-500/10 rounded text-slate-300 hover:text-white">Candidatic CRM</button>
-                  <button onClick={() => setActiveProject("Internal Support V2")} className="w-full text-left px-3 py-2 text-sm hover:bg-orange-500/10 rounded text-slate-300 hover:text-white">Internal Support V2</button>
-                  <button onClick={() => setActiveProject("Sales Auto-Responder")} className="w-full text-left px-3 py-2 text-sm hover:bg-orange-500/10 rounded text-slate-300 hover:text-white">Sales Auto-Responder</button>
-                </div>
-              </div>
+            <div className="hidden md:flex items-center gap-2 px-4 py-2 bg-white/5 rounded-lg border border-white/10 text-sm text-slate-300 backdrop-blur-sm">
+              <Globe size={16} className="text-emerald-500" />
+              <span>Network: <strong className="text-white">Global Edge Node</strong></span>
             </div>
 
-            <div className="flex bg-[#141414] rounded-lg p-1 border border-orange-900/40">
-              <button onClick={() => toggleAgent(true)} className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-all text-sm ${stats.agentActive ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 shadow-[0_0_10px_rgba(249,115,22,0.2)]' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}>
-                <Play size={14} fill={stats.agentActive ? "currentColor" : "none"} /> Engine ON
+            <div className="flex bg-black/40 rounded-lg p-1 border border-white/10 backdrop-blur-md">
+              <button onClick={() => toggleAgent(true)} className={`flex items-center gap-2 px-5 py-2.5 rounded-md transition-all text-sm font-bold tracking-wider ${stats.agentActive ? 'bg-orange-500/20 text-orange-400 border border-orange-500/50 shadow-[0_0_15px_rgba(249,115,22,0.2)]' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}>
+                <Play size={14} fill={stats.agentActive ? "currentColor" : "none"} /> ENGINE ONLINE
               </button>
-              <button onClick={() => toggleAgent(false)} className={`flex items-center gap-2 px-4 py-1.5 rounded-md transition-all text-sm ${!stats.agentActive ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}>
-                <Square size={14} fill={!stats.agentActive ? "currentColor" : "none"} /> Halt
+              <button onClick={() => toggleAgent(false)} className={`flex items-center gap-2 px-5 py-2.5 rounded-md transition-all text-sm font-bold tracking-wider ${!stats.agentActive ? 'bg-rose-500/20 text-rose-400 border border-rose-500/50 shadow-[0_0_15px_rgba(225,29,72,0.2)]' : 'text-slate-500 hover:text-slate-300 border border-transparent'}`}>
+                <Square size={14} fill={!stats.agentActive ? "currentColor" : "none"} /> HALT
               </button>
             </div>
           </div>
         </header>
 
-        {/* Metricas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          <div className="bg-[#141414] border border-orange-900/20 p-6 rounded-2xl flex items-center gap-4 hover:border-orange-500/30 transition-colors">
-            <div className="p-4 bg-orange-500/10 text-orange-500 rounded-xl">
-              <Activity size={24} />
-            </div>
-            <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Node Status</p>
-              <p className="text-2xl font-bold text-white flex items-center gap-2 mt-1">
-                {stats.agentActive ? "Online" : "Terminated"}
-                <span className={`w-2.5 h-2.5 rounded-full ${stats.agentActive ? "bg-orange-500 shadow-[0_0_8px_rgba(249,115,22,0.8)] animate-pulse" : "bg-rose-600"}`}></span>
-              </p>
-            </div>
-          </div>
-          <div className="bg-[#141414] border border-orange-900/20 p-6 rounded-2xl flex items-center gap-4 hover:border-orange-500/30 transition-colors">
-            <div className="p-4 bg-cyan-500/10 text-cyan-500 rounded-xl">
-              <Cpu size={24} />
-            </div>
-            <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Inferences (24h)</p>
-              <p className="text-2xl font-bold text-white mt-1">{stats.messagesToday}</p>
-            </div>
-          </div>
-          <div className="bg-[#141414] border border-orange-900/20 p-6 rounded-2xl flex items-center gap-4 hover:border-orange-500/30 transition-colors">
-            <div className="p-4 bg-rose-500/10 text-rose-500 rounded-xl">
-              <Users size={24} />
-            </div>
-            <div>
-              <p className="text-slate-500 text-xs font-bold uppercase tracking-wider">Human Handoffs</p>
-              <p className="text-2xl font-bold text-white mt-1">{stats.candidatesTransferred}</p>
-            </div>
-          </div>
+        {/* Global Metricas */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+          <MetricCard 
+            title="Core Node Logic" 
+            value={stats.agentActive ? "Running" : "Suspended"} 
+            subtitle="Real-time multi-agent processing"
+            icon={<Activity size={20} />} 
+            color="orange"
+            pulse={stats.agentActive}
+          />
+          <MetricCard 
+            title="Total Inferences" 
+            value={stats.inferences.toLocaleString()} 
+            subtitle="LLM compute tasks in 24h"
+            icon={<Cpu size={20} />} 
+            color="cyan"
+          />
+          <MetricCard 
+            title="Active Endpoints" 
+            value={stats.activeChannels} 
+            subtitle="Connected IO channels streams"
+            icon={<Network size={20} />} 
+            color="purple"
+          />
+          <MetricCard 
+            title="Global Latency" 
+            value={`${stats.avgLatency}ms`} 
+            subtitle="End-to-end routing time"
+            icon={<Zap size={20} />} 
+            color="emerald"
+          />
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:h-[600px]">
           
-          {/* Live Feed Terminal - Takes 2 columns */}
-          <div className="lg:col-span-2 bg-[#141414] rounded-2xl flex flex-col h-[600px] border border-orange-900/20 shadow-2xl relative overflow-hidden">
-            <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-orange-500 via-rose-500 to-purple-600 opacity-50"></div>
-            <div className="bg-[#0f0f0f] px-6 py-4 flex justify-between items-center border-b border-orange-900/20">
-              <h2 className="text-white font-mono text-sm tracking-wider flex items-center gap-2">
-                <Terminal size={16} className="text-orange-500" /> SYSTEM.STREAM
+          {/* Live System Stream (Left - 2cols) */}
+          <div className="lg:col-span-2 bg-[#0a0a0a]/80 backdrop-blur-xl rounded-3xl flex flex-col h-[600px] lg:h-full border border-white/5 shadow-2xl relative overflow-hidden group">
+            <div className="absolute top-0 left-0 w-full h-[1px] bg-gradient-to-r from-transparent via-orange-500/50 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-1000"></div>
+            
+            <div className="bg-black/50 px-6 py-5 flex justify-between items-center border-b border-white/5">
+              <h2 className="text-white font-mono text-sm tracking-widest flex items-center gap-3 font-semibold uppercase">
+                <Terminal size={18} className="text-orange-500" /> System.Stream_Log
               </h2>
-              <div className="flex gap-2">
-                <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-slate-700"></div>
-                <div className="w-2.5 h-2.5 rounded-full bg-orange-500/50"></div>
+              <div className="flex gap-3 items-center">
+                <span className="flex h-2.5 w-2.5 relative">
+                  <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${stats.agentActive ? 'bg-emerald-400' : 'bg-rose-400'}`}></span>
+                  <span className={`relative inline-flex rounded-full h-2.5 w-2.5 ${stats.agentActive ? 'bg-emerald-500' : 'bg-rose-500'}`}></span>
+                </span>
+                <span className="text-xs font-mono text-slate-500">{stats.agentActive ? 'Live feed connected' : 'Feed paused'}</span>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 font-mono text-[13px] leading-relaxed terminal-scroll space-y-3 bg-[#0a0a0a] bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-orange-900/5 via-[#0a0a0a] to-[#0a0a0a]">
+            
+            <div className="flex-1 overflow-y-auto p-6 font-mono text-[13.5px] leading-relaxed terminal-scroll space-y-3">
               {logs.length === 0 ? (
-                <div className="flex items-center gap-3 text-orange-500/40">
-                  <Activity size={16} className="animate-pulse" />
-                  <p>Awaiting WebSocket / SSE telemetry...</p>
+                <div className="flex items-center gap-3 text-slate-500 pt-4">
+                  <Activity size={18} className="animate-pulse" />
+                  <p>Initializing OpenClaw Neural Core...</p>
                 </div>
               ) : (
-                logs.map((log, i) => (
-                  <div key={i} className="flex gap-4 hover:bg-white/5 p-1 -mx-1 rounded transition-colors group">
-                    <span className="text-slate-600 shrink-0">
-                      [{new Date(log.timestamp).toISOString().split('T')[1].slice(0, 8)}]
+                logs.map((log: any, i: number) => (
+                  <div key={i} className="flex gap-4 hover:bg-white/5 p-1.5 -mx-1.5 rounded-lg transition-colors duration-200">
+                    <span className="text-slate-600/80 shrink-0 select-none">
+                      [{log.timestamp.split('T')[1].slice(0, 11)}]
                     </span>
-                    <span className={`flex-1 break-words ${getLogColor(log.type, log.level)}`}>
+                    <span className={`flex-1 break-words ${getLogStyle(log.type)}`}>
                       {log.message}
                     </span>
                   </div>
@@ -214,62 +206,137 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          <div className="space-y-6 flex flex-col">
-            {/* System Prompt Editor */}
-            <div className="bg-[#141414] border border-orange-900/20 rounded-2xl p-6 flex flex-col h-[288px]">
-              <div className="flex justify-between items-center mb-4">
-                <h2 className="text-white font-mono text-sm flex items-center gap-2">
-                  <Settings size={16} className="text-cyan-500" /> BASE_PROMPT
+          {/* Omnichannel Integrations (Right - 1col) */}
+          <div className="bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/5 rounded-3xl overflow-hidden flex flex-col h-[600px] lg:h-full relative shadow-2xl">
+            <div className="px-6 py-5 bg-black/50 border-b border-white/5 flex justify-between items-center z-10">
+              <div>
+                <h2 className="text-white font-semibold text-base flex items-center gap-2 tracking-wide">
+                  <Plug size={18} className="text-purple-500" /> IO Channels Gateway
                 </h2>
-                <button onClick={savePrompt} disabled={savingPrompt} className="bg-orange-500/10 hover:bg-orange-500/20 border border-orange-500/30 text-orange-500 px-3 py-1 rounded text-xs uppercase tracking-wider font-bold transition-all">
-                  {savingPrompt ? "SYNCING..." : "DEPLOY"}
-                </button>
+                <p className="text-xs text-slate-400 mt-1">Manage external endpoints & integrations</p>
               </div>
-              <textarea 
-                value={promptContent}
-                onChange={(e) => setPromptContent(e.target.value)}
-                className="flex-1 bg-[#0a0a0a] border border-orange-900/30 text-orange-100/80 p-4 rounded-xl focus:outline-none focus:border-orange-500/50 resize-none font-mono text-[13px] leading-relaxed"
-                placeholder="Loading directives..."
-              />
+              <button className="p-2 bg-purple-500/10 hover:bg-purple-500/20 text-purple-400 rounded-xl border border-purple-500/20 transition-all hover:scale-105 active:scale-95 shadow-[0_0_10px_rgba(168,85,247,0.2)]">
+                <Plus size={18} />
+              </button>
             </div>
+            
+            <div className="flex-1 overflow-y-auto p-5 space-y-4 custom-scrollbar z-10">
+              
+              {channels.map((channel: any) => (
+                <div key={channel.id} className="group bg-white/5 border border-white/5 hover:border-purple-500/40 rounded-2xl p-5 transition-all duration-300 hover:bg-white/[0.08] cursor-pointer shadow-lg hover:shadow-purple-500/10 hover:-translate-y-0.5">
+                  <div className="flex justify-between items-start mb-4">
+                    <div className="flex items-center gap-3.5">
+                      <div className={`p-3 rounded-xl shadow-inner ${
+                        channel.type === 'whatsapp' ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/20' : 
+                        channel.type === 'telegram' ? 'bg-sky-500/15 text-sky-400 border border-sky-500/20' : 
+                        'bg-rose-500/15 text-rose-400 border border-rose-500/20'
+                      }`}>
+                        {channel.type === 'whatsapp' && <MessageCircle size={22} />}
+                        {channel.type === 'telegram' && <Send size={22} />}
+                        {channel.type === 'webhook' && <Webhook size={22} />}
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-bold text-white group-hover:text-purple-200 transition-colors tracking-wide">{channel.name}</h3>
+                        <p className="text-[11px] font-medium text-slate-500 capitalize mt-0.5 tracking-wider uppercase">{channel.type} Integration</p>
+                      </div>
+                    </div>
+                    <button className="text-slate-500 hover:text-white opacity-0 group-hover:opacity-100 transition-opacity p-1">
+                      <MoreVertical size={18} />
+                    </button>
+                  </div>
+                  
+                  <div className="flex justify-between items-end bg-black/20 p-3 rounded-xl border border-white/5">
+                    <div className="flex items-center gap-1.5">
+                      {channel.status === 'connected' ? (
+                        <span className="flex items-center gap-1.5 bg-emerald-500/10 text-emerald-400 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border border-emerald-500/20">
+                          <CheckCircle2 size={12} /> Live
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1.5 bg-amber-500/10 text-amber-400 text-[10px] uppercase font-bold tracking-wider px-2.5 py-1 rounded-full border border-amber-500/20">
+                          <Zap size={12} /> Degraded
+                        </span>
+                      )}
+                    </div>
+                    <div className="text-right">
+                      <p className="text-[10px] uppercase tracking-wider font-semibold text-slate-500">Payloads Data</p>
+                      <p className="text-sm font-mono font-bold text-white mt-0.5">{channel.events.toLocaleString()}</p>
+                    </div>
+                  </div>
+                </div>
+              ))}
 
-            {/* Active Sessions */}
-            <div className="bg-[#141414] border border-orange-900/20 rounded-2xl overflow-hidden flex-1 flex flex-col h-[288px]">
-              <div className="px-6 py-4 bg-[#0f0f0f] border-b border-orange-900/20">
-                <h2 className="text-white font-mono text-sm flex items-center gap-2">
-                  <Network size={16} className="text-rose-500" /> ACTIVE_SESSIONS
-                </h2>
-              </div>
-              <div className="flex-1 overflow-y-auto terminal-scroll bg-[#0a0a0a]/50">
-                <table className="w-full text-sm text-left">
-                  <thead className="text-[10px] text-slate-500 bg-[#0f0f0f] uppercase tracking-wider">
-                    <tr>
-                      <th className="px-6 py-3 font-medium">Session ID (User)</th>
-                      <th className="px-6 py-3 font-medium">State</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {conversations.map(conv => (
-                      <tr key={conv.id} className="border-b border-orange-900/10 hover:bg-orange-500/5 transition-colors">
-                        <td className="px-6 py-4">
-                          <div className="font-mono text-slate-300">{conv.name !== conv.phone ? conv.name : 'Unknown Entity'}</div>
-                          <div className="text-xs text-orange-500/50 font-mono mt-1">{conv.phone}</div>
-                        </td>
-                        <td className="px-6 py-4">
-                          {getStatusBadge(conv.status)}
-                        </td>
-                      </tr>
-                    ))}
-                    {conversations.length === 0 && (
-                      <tr><td colSpan={2} className="px-6 py-12 text-center text-slate-600 font-mono text-sm">No active edge connections.</td></tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
+              <button className="w-full py-6 mt-6 border-2 border-dashed border-white/10 hover:border-purple-500/50 rounded-2xl text-sm font-bold text-slate-400 hover:text-purple-300 transition-all duration-300 flex flex-col items-center justify-center gap-3 group bg-black/20 hover:bg-purple-900/10">
+                <div className="p-3 bg-white/5 group-hover:bg-purple-500/20 group-hover:shadow-[0_0_15px_rgba(168,85,247,0.4)] rounded-full transition-all duration-300 group-hover:scale-110">
+                  <Plus size={24} className="text-slate-400 group-hover:text-purple-400" />
+                </div>
+                Deploy New Channel
+              </button>
+              
             </div>
+            
+            {/* Bottom Edge Fade */}
+            <div className="absolute bottom-0 left-0 w-full h-12 bg-gradient-to-t from-[#0a0a0a] to-transparent pointer-events-none z-20"></div>
           </div>
-
+          
         </div>
+      </div>
+      
+      {/* Dynamic Global Styles for Scrollbars */}
+      <style dangerouslySetInnerHTML={{__html: `
+        .terminal-scroll::-webkit-scrollbar { width: 6px; }
+        .terminal-scroll::-webkit-scrollbar-track { background: transparent; }
+        .terminal-scroll::-webkit-scrollbar-thumb { background: #333; border-radius: 10px; }
+        .terminal-scroll::-webkit-scrollbar-thumb:hover { background: #555; }
+        
+        .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: transparent; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: rgba(168, 85, 247, 0.2); border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb:hover { background: rgba(168, 85, 247, 0.4); }
+      `}} />
+    </div>
+  );
+}
+
+function MetricCard({ title, value, subtitle, icon, color, pulse = false }: any) {
+  const colorMap: Record<string, string> = {
+    orange: "from-orange-500/20 to-orange-500/5 text-orange-500 border-orange-500/20",
+    cyan: "from-cyan-500/20 to-cyan-500/5 text-cyan-500 border-cyan-500/20",
+    purple: "from-purple-500/20 to-purple-500/5 text-purple-500 border-purple-500/20",
+    emerald: "from-emerald-500/20 to-emerald-500/5 text-emerald-500 border-emerald-500/20",
+    rose: "from-rose-500/20 to-rose-500/5 text-rose-500 border-rose-500/20",
+  };
+
+  const ringMap: Record<string, string> = {
+    orange: "shadow-[0_0_15px_rgba(249,115,22,0.6)] bg-orange-500",
+    cyan: "shadow-[0_0_15px_rgba(6,182,212,0.6)] bg-cyan-500",
+    purple: "shadow-[0_0_15px_rgba(168,85,247,0.6)] bg-purple-500",
+    emerald: "shadow-[0_0_15px_rgba(16,185,129,0.6)] bg-emerald-500",
+    rose: "shadow-[0_0_15px_rgba(244,63,94,0.6)] bg-rose-500",
+  };
+
+  return (
+    <div className="bg-[#0a0a0a]/80 backdrop-blur-xl border border-white/5 p-6 rounded-3xl flex flex-col justify-between hover:border-white/10 transition-all duration-300 group relative overflow-hidden shadow-lg hover:-translate-y-1">
+      <div className={`absolute top-0 right-0 w-32 h-32 bg-gradient-to-bl ${colorMap[color]} blur-3xl rounded-full opacity-0 group-hover:opacity-40 transition-opacity duration-500 pointer-events-none`}></div>
+      <div className={`absolute -bottom-10 -left-10 w-32 h-32 bg-gradient-to-tr ${colorMap[color]} blur-3xl rounded-full opacity-10 group-hover:opacity-30 transition-opacity duration-500 pointer-events-none`}></div>
+      
+      <div className="flex justify-between items-start z-10">
+        <div className={`p-4 rounded-2xl bg-gradient-to-br ${colorMap[color]} bg-black shadow-inner`}>
+          {icon}
+        </div>
+        {pulse && (
+          <div className="pt-2 pr-2">
+            <span className="flex h-3 w-3 relative">
+              <span className={`animate-ping absolute inline-flex h-full w-full rounded-full opacity-75 ${ringMap[color]}`}></span>
+              <span className={`relative inline-flex rounded-full h-3 w-3 ${ringMap[color]}`}></span>
+            </span>
+          </div>
+        )}
+      </div>
+      
+      <div className="mt-6 z-10">
+        <p className="text-slate-400 text-[11px] font-bold uppercase tracking-widest">{title}</p>
+        <p className="text-3xl font-black text-white mt-1.5 tracking-tight">{value}</p>
+        <p className="text-xs text-slate-500 mt-2 font-medium">{subtitle}</p>
       </div>
     </div>
   );
