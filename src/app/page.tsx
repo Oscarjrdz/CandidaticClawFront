@@ -8,11 +8,11 @@ const API_KEY = process.env.NEXT_PUBLIC_VPS_API_KEY || "super_secret_key_123";
 
 export default function DashboardPage() {
   const [stats, setStats] = useState({ agentActive: false, activeConversations: 0, messagesToday: 0, candidatesTransferred: 0 });
-  const [conversations, setConversations] = useState([]);
-  const [logs, setLogs] = useState([]);
+  const [conversations, setConversations] = useState<any[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [promptContent, setPromptContent] = useState("");
   const [savingPrompt, setSavingPrompt] = useState(false);
-  const terminalEndRef = useRef(null);
+  const terminalEndRef = useRef<HTMLDivElement>(null);
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -69,7 +69,7 @@ export default function DashboardPage() {
     } catch (e) { console.error("Error prompt", e); }
   };
 
-  const toggleAgent = async (start) => {
+  const toggleAgent = async (start: boolean) => {
     const endpoint = start ? "start" : "stop";
     try {
       await fetch(`${API_URL}/api/admin/${endpoint}`, { method: "POST", headers });
@@ -94,13 +94,13 @@ export default function DashboardPage() {
   };
 
   // Render Helper para estatus
-  const getStatusBadge = (status) => {
+  const getStatusBadge = (status: string) => {
     if (status === 'Analizando') return <span className="bg-blue-500/20 text-blue-400 px-3 py-1 rounded-full text-xs flex items-center gap-1"><Clock size={12}/> Analizando</span>;
     if (status === 'Esperando Respuesta') return <span className="bg-yellow-500/20 text-yellow-400 px-3 py-1 rounded-full text-xs flex items-center gap-1"><MessageSquare size={12}/> Esperando</span>;
     return <span className="bg-green-500/20 text-green-400 px-3 py-1 rounded-full text-xs flex items-center gap-1"><CheckCircle2 size={12}/> Humano</span>;
   };
 
-  const getLogColor = (type, level) => {
+  const getLogColor = (type: string, level: string) => {
     if (type === 'sys') return 'text-purple-400 font-bold';
     if (level === 'thinking') return 'text-yellow-300 italic';
     if (level === 'info') return 'text-green-400';
@@ -257,7 +257,7 @@ export default function DashboardPage() {
                       </tr>
                     ))}
                     {conversations.length === 0 && (
-                      <tr><td colSpan="2" className="px-6 py-8 text-center text-slate-500">No hay interacciones recientes.</td></tr>
+                      <tr><td colSpan={2} className="px-6 py-8 text-center text-slate-500">No hay interacciones recientes.</td></tr>
                     )}
                   </tbody>
                 </table>
