@@ -68,6 +68,7 @@ export default function OpenClawDashboard() {
   const [sending, setSending] = useState(false);
   const [activeChannel, setActiveChannel] = useState<"dashboard" | "telegram">("dashboard");
   const chatEndRef = useRef<HTMLDivElement>(null);
+  const [messagesLoaded, setMessagesLoaded] = useState(false);
 
   // ── VPS Health Check ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -93,18 +94,44 @@ export default function OpenClawDashboard() {
     return () => clearInterval(interval);
   }, []);
 
-  // ── Load channels from localStorage ──────────────────────────────────────
+  // ── Load channels + messages + channel from localStorage ────────────────
   useEffect(() => {
-    const saved = localStorage.getItem("openclaw_channels");
-    if (saved) setChannels(JSON.parse(saved));
+    const savedChannels = localStorage.getItem("openclaw_channels");
+    if (savedChannels) setChannels(JSON.parse(savedChannels));
+
+    const savedChannel = localStorage.getItem("openclaw_active_channel") as "dashboard" | "telegram" | null;
+    if (savedChannel) setActiveChannel(savedChannel);
+
+    const savedMessages = localStorage.getItem("openclaw_messages");
+    if (savedMessages) {
+      const parsed = JSON.parse(savedMessages);
+      // Restaurar fechas como objetos Date
+      setMessages(parsed.map((m: ChatMessage & { ts: string }) => ({ ...m, ts: new Date(m.ts) })));
+    }
+    setMessagesLoaded(true);
   }, []);
 
-  // ── Chat scroll ───────────────────────────────────────────────────────────
+  // ── Chat scroll + persist messages ─────────────────────────────────────
   useEffect(() => {
     chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+    if (messagesLoaded) {
+      // Guardar solo los últimos 100 mensajes
+      const toSave = messages.slice(-100);
+      localStorage.setItem("openclaw_messages", JSON.stringify(toSave));
+    }
+  }, [messages, messagesLoaded]);
 
   // ── Handlers ──────────────────────────────────────────────────────────────
+
+  const switchChannel = (ch: "dashboard" | "telegram") => {
+    setActiveChannel(ch);
+    localStorage.setItem("openclaw_active_channel", ch);
+  };
+
+  const clearChat = () => {
+    setMessages([]);
+    localStorage.removeItem("openclaw_messages");
+  };
 
   const addChannel = () => {
     if (!newChannel.name.trim() || !newChannel.endpoint.trim()) return;
@@ -386,10 +413,12 @@ export default function OpenClawDashboard() {
                 <p className="text-xs text-slate-500 mt-1">Habla directo con tu agente</p>
               </div>
 
+              <div className="flex items-center gap-2">
+
               {/* Channel selector */}
               <div className="flex gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5">
                 <button
-                  onClick={() => setActiveChannel("dashboard")}
+                  onClick={() => switchChannel("dashboard")}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     activeChannel === "dashboard"
                       ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
@@ -399,7 +428,7 @@ export default function OpenClawDashboard() {
                   <Bot size={12} className="inline mr-1" />Admin
                 </button>
                 <button
-                  onClick={() => telegramActive && setActiveChannel("telegram")}
+                  onClick={() => telegramActive && switchChannel("telegram")}
                   disabled={!telegramActive}
                   className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
                     activeChannel === "telegram"
@@ -411,6 +440,14 @@ export default function OpenClawDashboard() {
                 >
                   <Send size={12} className="inline mr-1" />Telegram
                 </button>
+              </div>
+              <button
+                onClick={clearChat}
+                title="Limpiar chat"
+                className="p-2 text-slate-600 hover:text-slate-400 hover:bg-white/5 rounded-lg transition-all"
+              >
+                <Trash2 size={14} />
+              </button>
               </div>
             </div>
 
