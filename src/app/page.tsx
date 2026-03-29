@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Activity, Power, Terminal, Users, Play, Square, MessageSquare, Save, CheckCircle2, Clock, Bot, Settings } from "lucide-react";
 
-const API_URL = process.env.NEXT_PUBLIC_VPS_API_URL || "https://tired-views-reply.loca.lt";
+const API_URL = "/api/vps";
 const API_KEY = process.env.NEXT_PUBLIC_VPS_API_KEY || "super_secret_key_123";
 
 export default function DashboardPage() {
