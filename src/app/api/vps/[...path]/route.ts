@@ -6,7 +6,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params;
-  const vpsUrl = `http://64.23.180.202:3000/api/${resolvedParams.path.join('/')}`;
+  const vpsUrl = `http://64.23.180.202:3000/${resolvedParams.path.join('/')}`;
   const url = new URL(req.url);
   const targetUrl = new URL(vpsUrl);
   targetUrl.search = url.search;
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ path
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params;
-  const vpsUrl = `http://64.23.180.202:3000/api/${resolvedParams.path.join('/')}`;
+  const vpsUrl = `http://64.23.180.202:3000/${resolvedParams.path.join('/')}`;
   try {
     const body = await req.text();
     const response = await fetch(vpsUrl, {
@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ pat
 
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ path: string[] }> }) {
   const resolvedParams = await params;
-  const vpsUrl = `http://64.23.180.202:3000/api/${resolvedParams.path.join('/')}`;
+  const vpsUrl = `http://64.23.180.202:3000/${resolvedParams.path.join('/')}`;
   try {
     const body = await req.text();
     const response = await fetch(vpsUrl, {
