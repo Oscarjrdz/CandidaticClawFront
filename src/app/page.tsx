@@ -17,6 +17,7 @@ import {
   User,
   Trash2,
   X,
+  Radio,
 } from "lucide-react";
 
 const API_URL = "/api/vps";
@@ -30,6 +31,7 @@ interface VpsStats {
   activeConversations: number;
   messagesToday: number;
   candidatesTransferred: number;
+  channels?: { telegram?: string; whatsapp?: string };
 }
 
 interface Channel {
@@ -44,6 +46,7 @@ interface ChatMessage {
   role: "user" | "agent";
   content: string;
   ts: Date;
+  channel?: string;
 }
 
 // ─── Main Component ───────────────────────────────────────────────────────────
@@ -63,6 +66,7 @@ export default function OpenClawDashboard() {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState("");
   const [sending, setSending] = useState(false);
+  const [activeChannel, setActiveChannel] = useState<"dashboard" | "telegram">("dashboard");
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   // ── VPS Health Check ─────────────────────────────────────────────────────
@@ -85,11 +89,11 @@ export default function OpenClawDashboard() {
     };
 
     checkStats();
-    const interval = setInterval(checkStats, 15000); // ping every 15s
+    const interval = setInterval(checkStats, 15000);
     return () => clearInterval(interval);
   }, []);
 
-  // ── Load channels from localStorage (persisted locally) ──────────────────
+  // ── Load channels from localStorage ──────────────────────────────────────
   useEffect(() => {
     const saved = localStorage.getItem("openclaw_channels");
     if (saved) setChannels(JSON.parse(saved));
@@ -131,7 +135,7 @@ export default function OpenClawDashboard() {
     if (!text || sending) return;
     setInput("");
 
-    const userMsg: ChatMessage = { role: "user", content: text, ts: new Date() };
+    const userMsg: ChatMessage = { role: "user", content: text, ts: new Date(), channel: activeChannel };
     setMessages((prev) => [...prev, userMsg]);
     setSending(true);
 
@@ -139,13 +143,13 @@ export default function OpenClawDashboard() {
       const res = await fetch(`${API_URL}/api/admin/chat`, {
         method: "POST",
         headers: HEADERS,
-        body: JSON.stringify({ message: text, sessionId: "dashboard-chat" }),
+        body: JSON.stringify({ message: text, sessionId: `dashboard-${activeChannel}` }),
       });
 
       const data = await res.json();
 
       if (res.ok && data.reply) {
-        setMessages((prev) => [...prev, { role: "agent", content: data.reply, ts: new Date() }]);
+        setMessages((prev) => [...prev, { role: "agent", content: data.reply, ts: new Date(), channel: activeChannel }]);
       } else {
         const errMsg = data?.error || `Error ${res.status}`;
         setMessages((prev) => [...prev, { role: "agent", content: `⚠️ ${errMsg}`, ts: new Date() }]);
@@ -168,6 +172,8 @@ export default function OpenClawDashboard() {
     if (type === "telegram") return "bg-sky-500/10 border-sky-500/20";
     return "bg-rose-500/10 border-rose-500/20";
   };
+
+  const telegramActive = stats?.channels?.telegram === "active" || vpsStatus === "online";
 
   return (
     <div className="min-h-screen bg-[#050505] text-slate-200 font-sans p-5 md:p-8 relative overflow-hidden selection:bg-orange-500/30">
@@ -211,7 +217,7 @@ export default function OpenClawDashboard() {
           </div>
         </header>
 
-        {/* ── Stats row (only when online) ── */}
+        {/* ── Stats row ── */}
         {vpsStatus === "online" && stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
             {[
@@ -239,9 +245,9 @@ export default function OpenClawDashboard() {
             <div className="px-6 py-5 border-b border-white/5 flex items-center justify-between bg-black/30">
               <div>
                 <h2 className="text-white font-bold text-base flex items-center gap-2">
-                  <Webhook size={18} className="text-purple-400" /> Canales IO
+                  <Radio size={18} className="text-purple-400" /> Canales Activos
                 </h2>
-                <p className="text-xs text-slate-500 mt-1">Endpoints conectados a OpenClaw</p>
+                <p className="text-xs text-slate-500 mt-1">Canales conectados a OpenClaw</p>
               </div>
               <button
                 onClick={() => setShowNewChannel(!showNewChannel)}
@@ -249,6 +255,42 @@ export default function OpenClawDashboard() {
               >
                 <Plus size={15} /> Nuevo
               </button>
+            </div>
+
+            {/* ── System channels (from API) ── */}
+            <div className="border-b border-white/5">
+              {/* Telegram */}
+              <div
+                className={`flex items-center gap-4 px-6 py-4 transition-colors cursor-pointer ${
+                  activeChannel === "telegram" ? "bg-sky-500/5" : "hover:bg-white/[0.02]"
+                }`}
+                onClick={() => telegramActive && setActiveChannel("telegram")}
+              >
+                <div className={`p-2.5 rounded-xl border ${telegramActive ? "bg-sky-500/10 border-sky-500/20" : "bg-white/5 border-white/5"}`}>
+                  <Send size={20} className={telegramActive ? "text-sky-400" : "text-slate-600"} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white">Telegram</p>
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">@CandidaticBot · Long Polling</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {telegramActive ? (
+                    <>
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
+                      </span>
+                      <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-500/10 px-2 py-1 rounded-full border border-sky-500/20">
+                        Live
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] uppercase font-bold text-slate-500 bg-white/5 px-2 py-1 rounded-full border border-white/5">
+                      Offline
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
 
             {/* New channel form */}
@@ -299,13 +341,13 @@ export default function OpenClawDashboard() {
               </div>
             )}
 
-            {/* Channel list */}
+            {/* Custom channel list */}
             <div className="flex-1 overflow-y-auto divide-y divide-white/5">
               {channels.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-16 text-slate-600 gap-3">
-                  <Webhook size={32} className="opacity-40" />
-                  <p className="text-sm font-medium">Sin canales configurados</p>
-                  <p className="text-xs">Haz clic en "Nuevo" para agregar uno</p>
+                <div className="flex flex-col items-center justify-center py-10 text-slate-600 gap-3">
+                  <Webhook size={28} className="opacity-40" />
+                  <p className="text-sm font-medium">Sin canales adicionales</p>
+                  <p className="text-xs">Agrega webhooks personalizados</p>
                 </div>
               ) : (
                 channels.map((ch) => (
@@ -343,12 +385,45 @@ export default function OpenClawDashboard() {
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">Habla directo con tu agente</p>
               </div>
-              {vpsStatus === "offline" && (
-                <span className="text-[10px] text-rose-400 bg-rose-500/10 px-2 py-1 rounded-full border border-rose-500/20 font-bold">
-                  VPS desconectado
-                </span>
-              )}
+
+              {/* Channel selector */}
+              <div className="flex gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5">
+                <button
+                  onClick={() => setActiveChannel("dashboard")}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    activeChannel === "dashboard"
+                      ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
+                      : "text-slate-500 hover:text-slate-300"
+                  }`}
+                >
+                  <Bot size={12} className="inline mr-1" />Admin
+                </button>
+                <button
+                  onClick={() => telegramActive && setActiveChannel("telegram")}
+                  disabled={!telegramActive}
+                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                    activeChannel === "telegram"
+                      ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
+                      : telegramActive
+                      ? "text-slate-500 hover:text-slate-300"
+                      : "text-slate-700 cursor-not-allowed"
+                  }`}
+                >
+                  <Send size={12} className="inline mr-1" />Telegram
+                </button>
+              </div>
             </div>
+
+            {/* Channel context banner */}
+            {activeChannel === "telegram" && (
+              <div className="px-5 py-2.5 bg-sky-500/5 border-b border-sky-500/10 flex items-center gap-2 text-xs text-sky-400 shrink-0">
+                <span className="relative flex h-1.5 w-1.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                  <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-500" />
+                </span>
+                Sesión de Telegram — Los mensajes usan el mismo agente que @CandidaticBot
+              </div>
+            )}
 
             {/* Messages */}
             <div className="flex-1 overflow-y-auto px-5 py-4 space-y-4">
@@ -368,9 +443,16 @@ export default function OpenClawDashboard() {
                   )}
                   <div className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                     msg.role === "user"
-                      ? "bg-orange-500/15 border border-orange-500/20 text-orange-100 rounded-br-sm"
+                      ? msg.channel === "telegram"
+                        ? "bg-sky-500/15 border border-sky-500/20 text-sky-100 rounded-br-sm"
+                        : "bg-orange-500/15 border border-orange-500/20 text-orange-100 rounded-br-sm"
                       : "bg-white/[0.06] border border-white/5 text-slate-200 rounded-bl-sm"
                   }`}>
+                    {msg.channel === "telegram" && msg.role === "user" && (
+                      <p className="text-[9px] text-sky-400/60 font-bold uppercase tracking-widest mb-1 flex items-center gap-1">
+                        <Send size={8} />Telegram
+                      </p>
+                    )}
                     {msg.content}
                     <p className="text-[10px] opacity-40 mt-1.5 font-mono">
                       {msg.ts.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
@@ -406,13 +488,27 @@ export default function OpenClawDashboard() {
                   onChange={(e) => setInput(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
                   disabled={vpsStatus !== "online"}
-                  placeholder={vpsStatus === "online" ? "Escribe a OpenClaw..." : "VPS desconectado"}
-                  className="flex-1 bg-white/5 border border-white/10 focus:border-orange-500/40 outline-none text-sm text-white placeholder-slate-600 px-4 py-3 rounded-xl transition-colors disabled:opacity-40"
+                  placeholder={
+                    vpsStatus !== "online"
+                      ? "VPS desconectado"
+                      : activeChannel === "telegram"
+                      ? "Escribe como en Telegram..."
+                      : "Escribe a OpenClaw..."
+                  }
+                  className={`flex-1 border focus:outline-none text-sm text-white placeholder-slate-600 px-4 py-3 rounded-xl transition-colors disabled:opacity-40 ${
+                    activeChannel === "telegram"
+                      ? "bg-sky-500/5 border-sky-500/20 focus:border-sky-500/40"
+                      : "bg-white/5 border-white/10 focus:border-orange-500/40"
+                  }`}
                 />
                 <button
                   onClick={sendMessage}
                   disabled={sending || !input.trim() || vpsStatus !== "online"}
-                  className="px-4 py-3 bg-orange-500/20 hover:bg-orange-500/30 border border-orange-500/30 text-orange-400 rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100"
+                  className={`px-4 py-3 border rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100 ${
+                    activeChannel === "telegram"
+                      ? "bg-sky-500/20 hover:bg-sky-500/30 border-sky-500/30 text-sky-400"
+                      : "bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/30 text-orange-400"
+                  }`}
                 >
                   {sending ? <Loader2 size={18} className="animate-spin" /> : <ChevronRight size={18} />}
                 </button>
