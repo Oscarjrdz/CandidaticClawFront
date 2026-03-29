@@ -204,8 +204,7 @@ export default function DashboardPage() {
                     <span className="text-slate-600 shrink-0">
                       [{new Date(log.timestamp).toISOString().split('T')[1].slice(0, 8)}]
                     </span>
-                    <span className={`flex-1 break-words ${getLog
-Color(log.type, log.level)}`}>
+                    <span className={`flex-1 break-words ${getLogColor(log.type, log.level)}`}>
                       {log.message}
                     </span>
                   </div>
