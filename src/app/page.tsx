@@ -21,6 +21,7 @@ import {
   FileText,
   Save,
   RefreshCw,
+  ImageIcon,
 } from "lucide-react";
 
 const API_URL = "/api/vps";
@@ -83,6 +84,8 @@ export default function OpenClawDashboard() {
   const [activeChannel, setActiveChannel] = useState<"dashboard" | "telegram">("dashboard");
   const chatEndRef = useRef<HTMLDivElement>(null);
   const [messagesLoaded, setMessagesLoaded] = useState(false);
+  const [imagePreview, setImagePreview] = useState<{ base64: string; mimeType: string; url: string } | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   // System Prompt
   const [prompt, setPrompt] = useState("");
@@ -243,6 +246,57 @@ export default function OpenClawDashboard() {
       } else {
         const errMsg = data?.error || `Error ${res.status}`;
         setMessages((prev) => [...prev, { role: "agent", content: `⚠️ ${errMsg}`, ts: new Date() }]);
+      }
+    } catch {
+      setMessages((prev) => [...prev, { role: "agent", content: "⚠️ Sin conexión con el VPS", ts: new Date() }]);
+    } finally {
+      setSending(false);
+    }
+  };
+
+  const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const url = URL.createObjectURL(file);
+    const reader = new FileReader();
+    reader.onload = () => {
+      const b64 = (reader.result as string).split(",")[1];
+      setImagePreview({ base64: b64, mimeType: file.type, url });
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
+  };
+
+  const sendImage = async () => {
+    if (!imagePreview || sending) return;
+    const caption = input.trim();
+    setInput("");
+    const preview = imagePreview;
+    setImagePreview(null);
+
+    setMessages((prev) => [...prev, {
+      role: "user",
+      content: caption ? `📷 [Imagen] ${caption}` : "📷 [Imagen enviada]",
+      ts: new Date(),
+      channel: activeChannel,
+    }]);
+    setSending(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/chat`, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({
+          message: caption,
+          imageBase64: preview.base64,
+          mimeType: preview.mimeType,
+          sessionId: `dashboard-${activeChannel}`,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.reply) {
+        setMessages((prev) => [...prev, { role: "agent", content: data.reply, ts: new Date(), channel: activeChannel }]);
+      } else {
+        setMessages((prev) => [...prev, { role: "agent", content: `⚠️ ${data?.error || res.status}`, ts: new Date() }]);
       }
     } catch {
       setMessages((prev) => [...prev, { role: "agent", content: "⚠️ Sin conexión con el VPS", ts: new Date() }]);
@@ -565,15 +619,41 @@ export default function OpenClawDashboard() {
 
             {/* Input */}
             <div className="px-4 py-4 border-t border-white/5 bg-black/20 shrink-0">
+              {/* Image preview */}
+              {imagePreview && (
+                <div className="flex items-center gap-2 px-1 pb-1">
+                  <div className="relative">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={imagePreview.url} alt="preview" className="h-14 w-14 rounded-xl object-cover border border-white/10" />
+                    <button onClick={() => setImagePreview(null)} className="absolute -top-1.5 -right-1.5 bg-rose-500 rounded-full p-0.5 hover:bg-rose-400 transition-colors">
+                      <X size={10} />
+                    </button>
+                  </div>
+                  <span className="text-[11px] text-slate-500">Imagen lista — agrega un caption opcional</span>
+                </div>
+              )}
               <div className="flex gap-2">
+                {/* Hidden file input */}
+                <input ref={fileInputRef} type="file" accept="image/*" className="hidden" onChange={handleImageSelect} />
+                {/* Photo button */}
+                <button
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={vpsStatus !== "online" || sending}
+                  title="Adjuntar imagen"
+                  className="px-3 py-3 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 hover:text-slate-200 rounded-xl transition-all disabled:opacity-40"
+                >
+                  <ImageIcon size={18} />
+                </button>
                 <input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && sendMessage()}
+                  onKeyDown={(e) => e.key === "Enter" && !e.shiftKey && (imagePreview ? sendImage() : sendMessage())}
                   disabled={vpsStatus !== "online"}
                   placeholder={
                     vpsStatus !== "online"
                       ? "VPS desconectado"
+                      : imagePreview
+                      ? "Caption opcional..."
                       : activeChannel === "telegram"
                       ? "Escribe como en Telegram..."
                       : "Escribe a OpenClaw..."
@@ -585,15 +665,15 @@ export default function OpenClawDashboard() {
                   }`}
                 />
                 <button
-                  onClick={sendMessage}
-                  disabled={sending || !input.trim() || vpsStatus !== "online"}
+                  onClick={imagePreview ? sendImage : sendMessage}
+                  disabled={sending || (!input.trim() && !imagePreview) || vpsStatus !== "online"}
                   className={`px-4 py-3 border rounded-xl transition-all hover:scale-105 active:scale-95 disabled:opacity-40 disabled:scale-100 ${
                     activeChannel === "telegram"
                       ? "bg-sky-500/20 hover:bg-sky-500/30 border-sky-500/30 text-sky-400"
                       : "bg-orange-500/20 hover:bg-orange-500/30 border-orange-500/30 text-orange-400"
                   }`}
                 >
-                  {sending ? <Loader2 size={18} className="animate-spin" /> : <ChevronRight size={18} />}
+                  {sending ? <Loader2 size={18} className="animate-spin" /> : imagePreview ? <ImageIcon size={18} /> : <ChevronRight size={18} />}
                 </button>
               </div>
             </div>
