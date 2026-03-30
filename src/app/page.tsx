@@ -578,7 +578,7 @@ export default function OpenClawDashboard() {
                       <Bot size={14} className="text-orange-400" />
                     </div>
                   )}
-                  <div className={`max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
+                  <div className={`whitespace-pre-wrap max-w-[78%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${
                     msg.role === "user"
                       ? msg.channel === "telegram"
                         ? "bg-sky-500/15 border border-sky-500/20 text-sky-100 rounded-br-sm"
