@@ -142,9 +142,9 @@ export default function OpenClawDashboard() {
 
   // ── Chat scroll + persist messages ─────────────────────────────────────
   useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    // instant on first load, smooth on new messages
+    chatEndRef.current?.scrollIntoView({ behavior: messagesLoaded ? "smooth" : "instant" });
     if (messagesLoaded) {
-      // Guardar solo los últimos 100 mensajes
       const toSave = messages.slice(-100);
       localStorage.setItem("openclaw_messages", JSON.stringify(toSave));
     }
@@ -477,40 +477,23 @@ export default function OpenClawDashboard() {
               </div>
 
               <div className="flex items-center gap-2">
-
-              {/* Channel selector */}
-              <div className="flex gap-1.5 bg-white/5 p-1 rounded-xl border border-white/5">
+                <div className="flex items-center gap-1.5 px-3 py-1.5 bg-sky-500/10 border border-sky-500/20 rounded-xl">
+                  <Send size={12} className="text-sky-400" />
+                  <span className="text-xs font-bold text-sky-300">Telegram</span>
+                  {telegramActive && (
+                    <span className="relative flex h-1.5 w-1.5 ml-1">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-sky-500" />
+                    </span>
+                  )}
+                </div>
                 <button
-                  onClick={() => switchChannel("dashboard")}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    activeChannel === "dashboard"
-                      ? "bg-orange-500/20 text-orange-300 border border-orange-500/30"
-                      : "text-slate-500 hover:text-slate-300"
-                  }`}
+                  onClick={clearChat}
+                  title="Limpiar chat"
+                  className="p-2 text-slate-600 hover:text-slate-400 hover:bg-white/5 rounded-lg transition-all"
                 >
-                  <Bot size={12} className="inline mr-1" />Admin
+                  <Trash2 size={14} />
                 </button>
-                <button
-                  onClick={() => telegramActive && switchChannel("telegram")}
-                  disabled={!telegramActive}
-                  className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all ${
-                    activeChannel === "telegram"
-                      ? "bg-sky-500/20 text-sky-300 border border-sky-500/30"
-                      : telegramActive
-                      ? "text-slate-500 hover:text-slate-300"
-                      : "text-slate-700 cursor-not-allowed"
-                  }`}
-                >
-                  <Send size={12} className="inline mr-1" />Telegram
-                </button>
-              </div>
-              <button
-                onClick={clearChat}
-                title="Limpiar chat"
-                className="p-2 text-slate-600 hover:text-slate-400 hover:bg-white/5 rounded-lg transition-all"
-              >
-                <Trash2 size={14} />
-              </button>
               </div>
             </div>
 
@@ -617,7 +600,9 @@ export default function OpenClawDashboard() {
           </section>
         </div>
 
-        {/* ── Skills Panel ── */}
+        {/* ── Skills + Prompt 50/50 ── */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Skills Panel */}
         <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
           <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between">
             <div>
@@ -663,8 +648,8 @@ export default function OpenClawDashboard() {
           </div>
         </section>
 
-        {/* ── System Prompt Editor ── */}
-        <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+        {/* System Prompt Editor */}
+        <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
           <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between">
             <div>
               <h2 className="text-white font-bold text-base flex items-center gap-2">
@@ -722,8 +707,10 @@ export default function OpenClawDashboard() {
             </p>
           </div>
         </section>
+        </div>{/* end 50/50 grid */}
 
       </div>
     </div>
   );
 }
+
