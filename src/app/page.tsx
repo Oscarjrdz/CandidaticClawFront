@@ -143,11 +143,13 @@ export default function OpenClawDashboard() {
     loadSkills();
   }, []);
 
+  const isFirstLoad = useRef(true);
+
   // ── Chat scroll + persist messages ─────────────────────────────────────
   useEffect(() => {
-    // instant on first load, smooth on new messages
-    chatEndRef.current?.scrollIntoView({ behavior: messagesLoaded ? "smooth" : "instant" });
+    chatEndRef.current?.scrollIntoView({ behavior: isFirstLoad.current ? "instant" : "smooth" });
     if (messagesLoaded) {
+      isFirstLoad.current = false;
       const toSave = messages.slice(-100);
       localStorage.setItem("openclaw_messages", JSON.stringify(toSave));
     }
@@ -361,25 +363,7 @@ export default function OpenClawDashboard() {
           </div>
         </header>
 
-        {/* ── Stats row ── */}
-        {vpsStatus === "online" && stats && (
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[
-              { label: "Estado", value: stats.agentActive ? "Activo" : "Inactivo", color: stats.agentActive ? "text-emerald-400" : "text-rose-400", icon: <Activity size={18} /> },
-              { label: "Conversaciones", value: stats.activeConversations, color: "text-orange-400", icon: <MessageCircle size={18} /> },
-              { label: "Mensajes Hoy", value: stats.messagesToday, color: "text-cyan-400", icon: <Zap size={18} /> },
-              { label: "Transferidos", value: stats.candidatesTransferred, color: "text-purple-400", icon: <CheckCircle2 size={18} /> },
-            ].map((s) => (
-              <div key={s.label} className="bg-white/[0.03] border border-white/5 rounded-2xl p-4 flex items-center gap-3 hover:border-white/10 transition-all">
-                <div className={`${s.color} opacity-80`}>{s.icon}</div>
-                <div>
-                  <p className="text-[10px] text-slate-500 uppercase tracking-widest font-bold">{s.label}</p>
-                  <p className={`text-xl font-black ${s.color} mt-0.5`}>{s.value}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
+        {/* ── Stats row removed by user request ── */}
 
         {/* ── Main 2-col grid ── */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
