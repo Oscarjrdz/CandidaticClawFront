@@ -22,6 +22,7 @@ import {
   Save,
   RefreshCw,
   ImageIcon,
+  Minus,
 } from "lucide-react";
 
 const API_URL = "/api/vps";
@@ -96,6 +97,10 @@ export default function OpenClawDashboard() {
   // Skills
   const [skills, setSkills] = useState<Skill[]>([]);
   const [skillsLoading, setSkillsLoading] = useState(false);
+
+  // Accordion State
+  const [skillsOpen, setSkillsOpen] = useState(false);
+  const [promptOpen, setPromptOpen] = useState(false);
 
   // ── VPS Health Check ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -668,62 +673,78 @@ export default function OpenClawDashboard() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Skills Panel */}
         <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
-          <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between">
-            <div>
-              <h2 className="text-white font-bold text-base flex items-center gap-2">
-                <Zap size={18} className="text-yellow-400" /> Skills Disponibles
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">Capacidades instaladas en OpenClaw</p>
+          <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => setSkillsOpen(!skillsOpen)}>
+            <div className="flex items-center gap-3">
+              <button className="p-1 hover:bg-white/10 rounded-md text-slate-400 transition-colors">
+                {skillsOpen ? <Minus size={16} /> : <Plus size={16} />}
+              </button>
+              <div>
+                <h2 className="text-white font-bold text-base flex items-center gap-2">
+                  <Zap size={18} className="text-yellow-400" /> Skills Disponibles
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Capacidades instaladas en OpenClaw</p>
+              </div>
             </div>
-            <button onClick={loadSkills} disabled={skillsLoading} className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 rounded-lg text-xs font-bold transition-all">
+            <button 
+              onClick={(e) => { e.stopPropagation(); loadSkills(); }} 
+              disabled={skillsLoading} 
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 rounded-lg text-xs font-bold transition-all"
+            >
               <RefreshCw size={13} className={skillsLoading ? "animate-spin" : ""} /> Recargar
             </button>
           </div>
-          <div className="p-5">
-            {skillsLoading ? (
-              <div className="flex items-center justify-center h-20 gap-2 text-slate-600"><Loader2 size={16} className="animate-spin" /><span className="text-sm">Cargando skills...</span></div>
-            ) : skills.length === 0 ? (
-              <div className="flex items-center justify-center h-20 text-slate-600 text-sm">VPS offline o sin skills detectados</div>
-            ) : (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {skills.map((skill) => {
-                  const s = { active: { label:"Activo", cls:"text-emerald-400 bg-emerald-500/10 border-emerald-500/20" }, planned: { label:"Pendiente", cls:"text-amber-400 bg-amber-500/10 border-amber-500/20" }, misconfigured: { label:"Error config", cls:"text-rose-400 bg-rose-500/10 border-rose-500/20" }, unknown: { label:"Desconocido", cls:"text-slate-400 bg-white/5 border-white/5" } }[skill.status] ?? { label: skill.status, cls:"text-slate-400 bg-white/5 border-white/5" };
-                  return (
-                    <div key={skill.id} className={`flex flex-col gap-2 p-4 rounded-2xl border transition-all hover:border-white/15 ${skill.status==="active" ? "bg-white/[0.025] border-white/8" : "bg-black/30 border-white/5 opacity-70"}`}>
-                      <div className="flex items-start justify-between gap-2">
-                        <span className="text-2xl leading-none">{skill.emoji}</span>
-                        <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border shrink-0 ${s.cls}`}>{s.label}</span>
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-white">{skill.name}</p>
-                        <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-2">{skill.description}</p>
-                      </div>
-                      {skill.status === "active" && (
-                        <div className="flex items-center gap-1.5 mt-1">
-                          <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" /></span>
-                          <span className="text-[10px] text-emerald-500 font-mono">running</span>
+          {skillsOpen && (
+            <div className="p-5">
+              {skillsLoading ? (
+                <div className="flex items-center justify-center h-20 gap-2 text-slate-600"><Loader2 size={16} className="animate-spin" /><span className="text-sm">Cargando skills...</span></div>
+              ) : skills.length === 0 ? (
+                <div className="flex items-center justify-center h-20 text-slate-600 text-sm">VPS offline o sin skills detectados</div>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {skills.map((skill) => {
+                    const s = { active: { label:"Activo", cls:"text-emerald-400 bg-emerald-500/10 border-emerald-500/20" }, planned: { label:"Pendiente", cls:"text-amber-400 bg-amber-500/10 border-amber-500/20" }, misconfigured: { label:"Error config", cls:"text-rose-400 bg-rose-500/10 border-rose-500/20" }, unknown: { label:"Desconocido", cls:"text-slate-400 bg-white/5 border-white/5" } }[skill.status] ?? { label: skill.status, cls:"text-slate-400 bg-white/5 border-white/5" };
+                    return (
+                      <div key={skill.id} className={`flex flex-col gap-2 p-4 rounded-2xl border transition-all hover:border-white/15 ${skill.status==="active" ? "bg-white/[0.025] border-white/8" : "bg-black/30 border-white/5 opacity-70"}`}>
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="text-2xl leading-none">{skill.emoji}</span>
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full border shrink-0 ${s.cls}`}>{s.label}</span>
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
+                        <div>
+                          <p className="text-sm font-semibold text-white">{skill.name}</p>
+                          <p className="text-[11px] text-slate-500 mt-1 leading-relaxed line-clamp-2">{skill.description}</p>
+                        </div>
+                        {skill.status === "active" && (
+                          <div className="flex items-center gap-1.5 mt-1">
+                            <span className="relative flex h-1.5 w-1.5"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75" /><span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500" /></span>
+                            <span className="text-[10px] text-emerald-500 font-mono">running</span>
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </section>
 
         {/* System Prompt Editor */}
         <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col">
-          <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between">
-            <div>
-              <h2 className="text-white font-bold text-base flex items-center gap-2">
-                <FileText size={18} className="text-amber-400" /> System Prompt
-              </h2>
-              <p className="text-xs text-slate-500 mt-1">Instrucciones base de OpenClaw — se aplican en tiempo real</p>
+          <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => setPromptOpen(!promptOpen)}>
+            <div className="flex items-center gap-3">
+              <button className="p-1 hover:bg-white/10 rounded-md text-slate-400 transition-colors">
+                {promptOpen ? <Minus size={16} /> : <Plus size={16} />}
+              </button>
+              <div>
+                <h2 className="text-white font-bold text-base flex items-center gap-2">
+                  <FileText size={18} className="text-amber-400" /> System Prompt
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Instrucciones base de OpenClaw — se aplican en tiempo real</p>
+              </div>
             </div>
             <div className="flex items-center gap-2">
               <button
-                onClick={loadPrompt}
+                onClick={(e) => { e.stopPropagation(); loadPrompt(); }}
                 disabled={promptLoading}
                 className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 rounded-lg text-xs font-bold transition-all"
               >
@@ -731,7 +752,7 @@ export default function OpenClawDashboard() {
                 Recargar
               </button>
               <button
-                onClick={savePrompt}
+                onClick={(e) => { e.stopPropagation(); savePrompt(); }}
                 disabled={promptSaving || vpsStatus !== "online"}
                 className={`flex items-center gap-1.5 px-4 py-1.5 rounded-lg text-xs font-bold transition-all border ${
                   promptSaved
@@ -750,26 +771,28 @@ export default function OpenClawDashboard() {
               </button>
             </div>
           </div>
-          <div className="p-5">
-            {promptLoading ? (
-              <div className="flex items-center justify-center h-32 text-slate-600 gap-2">
-                <Loader2 size={18} className="animate-spin" />
-                <span className="text-sm">Cargando prompt desde el VPS...</span>
-              </div>
-            ) : (
-              <textarea
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-                rows={12}
-                placeholder="Escribe aquí las instrucciones del agente..."
-                className="w-full bg-black/40 border border-white/8 focus:border-amber-500/30 outline-none text-sm text-slate-200 placeholder-slate-600 px-4 py-3 rounded-xl transition-colors font-mono leading-relaxed resize-y"
-              />
-            )}
-            <p className="text-[11px] text-slate-600 mt-2 flex items-center gap-1">
-              <FileText size={10} />
-              Guardado en <span className="font-mono text-slate-500">workspace/AGENTS.md</span> · Cambios en tiempo real sin reiniciar el servidor
-            </p>
-          </div>
+          {promptOpen && (
+            <div className="p-5">
+              {promptLoading ? (
+                <div className="flex items-center justify-center h-32 text-slate-600 gap-2">
+                  <Loader2 size={18} className="animate-spin" />
+                  <span className="text-sm">Cargando prompt desde el VPS...</span>
+                </div>
+              ) : (
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  rows={12}
+                  placeholder="Escribe aquí las instrucciones del agente..."
+                  className="w-full bg-black/40 border border-white/8 focus:border-amber-500/30 outline-none text-sm text-slate-200 placeholder-slate-600 px-4 py-3 rounded-xl transition-colors font-mono leading-relaxed resize-y"
+                />
+              )}
+              <p className="text-[11px] text-slate-600 mt-2 flex items-center gap-1">
+                <FileText size={10} />
+                Guardado en <span className="font-mono text-slate-500">workspace/AGENTS.md</span> · Cambios en tiempo real sin reiniciar el servidor
+              </p>
+            </div>
+          )}
         </section>
         </div>{/* end 50/50 grid */}
 
