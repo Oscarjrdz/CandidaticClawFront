@@ -36,7 +36,7 @@ interface VpsStats {
   activeConversations: number;
   messagesToday: number;
   candidatesTransferred: number;
-  channels?: { telegram?: string; whatsapp?: string };
+  channels?: { telegram?: string; whatsapp?: string; facebook?: string; };
 }
 
 interface Channel {
@@ -414,6 +414,36 @@ export default function OpenClawDashboard() {
                         <span className="relative inline-flex rounded-full h-2 w-2 bg-sky-500" />
                       </span>
                       <span className="text-[10px] uppercase font-bold text-sky-400 bg-sky-500/10 px-2 py-1 rounded-full border border-sky-500/20">
+                        Live
+                      </span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] uppercase font-bold text-slate-500 bg-white/5 px-2 py-1 rounded-full border border-white/5">
+                      Offline
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* Facebook */}
+              <div
+                className="flex items-center gap-4 px-6 py-4 border-t border-white/5 transition-colors cursor-pointer hover:bg-white/[0.02]"
+              >
+                <div className={`p-2.5 rounded-xl border ${stats?.channels?.facebook === 'active' ? "bg-blue-500/10 border-blue-500/20" : "bg-white/5 border-white/5"}`}>
+                  <Network size={20} className={stats?.channels?.facebook === 'active' ? "text-blue-400" : "text-slate-600"} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white">Facebook Automator</p>
+                  <p className="text-[11px] text-slate-500 font-mono mt-0.5">Puppeteer · DigitalOcean VPS</p>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  {stats?.channels?.facebook === 'active' ? (
+                    <>
+                      <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-blue-400 opacity-75" />
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-blue-500" />
+                      </span>
+                      <span className="text-[10px] uppercase font-bold text-blue-400 bg-blue-500/10 px-2 py-1 rounded-full border border-blue-500/20">
                         Live
                       </span>
                     </>
