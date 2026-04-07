@@ -924,7 +924,32 @@ export default function OpenClawDashboard() {
                             <span className="text-[10px] text-slate-500">Preview del grupo</span>
                           </div>
                         </div>
-                        {mktData.activeCampaign?.groupText || "Sin campaña guardada."}
+                        {(() => {
+                          const text = mktData.activeCampaign?.groupText || "Sin campaña guardada.";
+                          const urlMatch = text.match(/https?:\/\/[^\s]+/);
+                          const url = urlMatch ? urlMatch[0] : null;
+                          const plainText = text.replace(url || '', '').trim();
+
+                          return (
+                            <div className="flex flex-col gap-3">
+                              {plainText && <p className="whitespace-pre-wrap">{plainText}</p>}
+                              {url && url.includes('facebook') && (
+                                <div className="w-full bg-white rounded-lg overflow-hidden mt-2 flex justify-center">
+                                  <iframe 
+                                    src={`https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}&show_text=true&width=350`}
+                                    width="350" 
+                                    height="450" 
+                                    style={{ border: "none", overflow: "hidden" }} 
+                                    scrolling="yes" 
+                                    frameBorder="0" 
+                                    allowFullScreen={true} 
+                                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                                  ></iframe>
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })()}
                       </div>
                     </div>
 
