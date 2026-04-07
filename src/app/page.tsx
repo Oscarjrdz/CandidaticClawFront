@@ -1050,7 +1050,10 @@ export default function OpenClawDashboard() {
                                 <td className="px-4 py-3 font-mono text-xs">{String((task.hour - 6 + 24) % 24).padStart(2,'0')}:{String(task.minute).padStart(2,'0')}</td>
                                 <td className="px-4 py-3 text-xs w-full">
                                   <div className="flex items-center justify-between gap-2 max-w-[300px]">
-                                    <span className="truncate" title={task.groupName}>{task.groupName}</span>
+                                    <div className="flex flex-col truncate">
+                                      <span className="truncate" title={task.groupName}>{task.groupName}</span>
+                                      {task.members && <span className="text-[10px] text-emerald-500/70 font-mono mt-0.5">👥 {task.members}</span>}
+                                    </div>
                                     {task.groupId && (
                                       <a 
                                         href={`https://www.facebook.com/groups/${task.groupId}/?sorting_setting=CHRONOLOGICAL`}
