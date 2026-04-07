@@ -1046,7 +1046,7 @@ export default function OpenClawDashboard() {
                                 <td className="px-4 py-3">
                                   {task.done ? (task.error ? <XCircle size={14} className="text-rose-500" /> : <CheckCircle2 size={14} className="text-emerald-500" />) : <span className="text-slate-600 inline-block w-2 h-2 rounded-full bg-slate-700"/>}
                                 </td>
-                                <td className="px-4 py-3 font-mono text-xs">{String(task.hour).padStart(2,'0')}:{String(task.minute).padStart(2,'0')}</td>
+                                <td className="px-4 py-3 font-mono text-xs">{String((task.hour - 6 + 24) % 24).padStart(2,'0')}:{String(task.minute).padStart(2,'0')}</td>
                                 <td className="px-4 py-3 text-xs truncate max-w-[200px]">{task.groupName}</td>
                               </tr>
                             )) : (
