@@ -2,199 +2,119 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 
-const PALETTE: Record<string, string> = {
-  '.': 'transparent',
-  'k': '#0f172a', // Midnight outline
-  's': '#cbd5e1', // Silver armor light
-  'd': '#64748b', // Dark silver armor
-  'o': '#fcd34d', // Face skin tone
-  'r': '#ff00aa', // Laser blast
-  'g': '#334155'  // Gun metal
-};
-
+// Coordenadas aproximadas del sprite (ajusta X y Y según el PNG descargado)
+// Asumiendo que el archivo descargado tiene frames de Robocop caminando.
 const FRAMES = {
-  idle: [
-    "....kkkk........",
-    "...kssssk.......",
-    "..ksskkssk......",
-    "..kskkkkdk......",
-    ".kskookdok......",
-    ".kddkkdddk......",
-    ".ksdddddsk......",
-    "..kkssskk..k....",
-    ".kssssssskk.....",
-    ".kssssssskg.....",
-    "..kdddddk.k.....",
-    "...ksssk........",
-    "...kdddk........",
-    "...ks.sk........",
-    "...k...k........",
-    "...kk..kk......."
-  ],
-  walk1: [
-    "....kkkk........",
-    "...kssssk.......",
-    "..ksskkssk......",
-    "..kskkkkdk......",
-    ".kskookdok......",
-    ".kddkkdddk......",
-    ".ksdddddsk......",
-    "..kkssskk.......",
-    ".ksssssssk......",
-    ".ksssssssk.gk...",
-    "..kdddddk..k....",
-    "...ksssk...k....",
-    "...k..ddk.......",
-    "..kk..ksk.......",
-    "..k....k........",
-    "...k...kk......."
-  ],
-  walk2: [
-    "....kkkk........",
-    "...kssssk.......",
-    "..ksskkssk......",
-    "..kskkkkdk......",
-    ".kskookdok......",
-    ".kddkkdddk......",
-    ".ksdddddsk......",
-    "..kkssskk.......",
-    ".ksssssssk......",
-    ".ksssssssk.gk...",
-    "..kdddddk..k....",
-    "...ksssk..k.....",
-    "...kdddk........",
-    '...ks.k.........',
-    '...k.kk.........',
-    '...k.k..........'
-  ],
-  shoot: [
-    "....kkkk........",
-    "...kssssk.......",
-    "..ksskkssk......",
-    "..kskkkkdk......",
-    ".kskookdok......",
-    ".kddkkdddk......",
-    ".ksdddddsk......",
-    "..kkssskk.......",
-    "..ssssssskgggggr",
-    ".kdddddddk...k..",
-    "..ksssssk.......",
-    "...kdddk........",
-    "...ks.sok.......",
-    "...k...k........",
-    "...kk..kk......."
-  ]
+  idle:  { x: 16, y: 10, w: 26, h: 36 },
+  walk1: { x: 54, y: 10, w: 26, h: 36 },
+  walk2: { x: 88, y: 10, w: 26, h: 36 },
+  walk3: { x: 122, y: 10, w: 26, h: 36 },
+  shoot: { x: 156, y: 10, w: 38, h: 36 },
 };
 
 export default function RobocopMascot({ successCount }: { successCount: number }) {
-  const [frame, setFrame] = useState<'idle' | 'walk1' | 'walk2' | 'shoot'>('idle');
+  const [posX, setPosX] = useState(0); 
   const [direction, setDirection] = useState<'left' | 'right'>('right');
-  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
-  const [isHovered, setIsHovered] = useState(false);
-  
-  const containerRef = useRef<HTMLDivElement>(null);
-  const prevSuccessRef = useRef(successCount);
-  const walkIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const [frame, setFrame] = useState<'idle'|'walk1'|'walk2'|'walk3'|'shoot'>('idle');
+  const [isRoaming, setIsRoaming] = useState(true);
 
-  // Success Celebration (Disparo de éxito)
+  const prevSuccessRef = useRef(successCount);
+
+  // Reacción al éxito (Disparo)
   useEffect(() => {
     if (successCount > prevSuccessRef.current) {
+      setIsRoaming(false);
       setFrame('shoot');
       setTimeout(() => {
+        setIsRoaming(true);
         setFrame('idle');
-      }, 3000);
+      }, 2500);
     }
     prevSuccessRef.current = successCount;
   }, [successCount]);
 
-  // Interacción Mouse y Scroll
+  // Bucle de Roaming
   useEffect(() => {
-    const handleMouseMove = (e: MouseEvent) => {
-      if (!containerRef.current) return;
-      const rect = containerRef.current.getBoundingClientRect();
-      const mascotX = rect.left + rect.width / 2;
-      
-      // Orientar a Robocop
-      if (e.clientX > mascotX + 50) setDirection('right');
-      else if (e.clientX < mascotX - 50) setDirection('left');
-    };
+    if (!isRoaming) return;
 
-    let scrollTimeout: NodeJS.Timeout;
-    const handleScroll = () => {
-      // Activar animación de caminar al hacer scroll
-      if (frame !== 'shoot') {
-        if (!walkIntervalRef.current) {
-          let toggle = false;
-          setFrame('walk1');
-          walkIntervalRef.current = setInterval(() => {
-            toggle = !toggle;
-            setFrame(toggle ? 'walk2' : 'walk1');
-          }, 150);
-        }
-        
-        clearTimeout(scrollTimeout);
-        scrollTimeout = setTimeout(() => {
-          if (walkIntervalRef.current) {
-            clearInterval(walkIntervalRef.current);
-            walkIntervalRef.current = null;
-          }
-          setFrame(prev => prev !== 'shoot' ? 'idle' : prev);
-        }, 300);
+    let walkCycle = 0;
+    const walkFrames: Array<'walk1'|'walk2'|'walk3'> = ['walk1', 'walk2', 'walk3', 'walk2'];
+
+    const intervalId = setInterval(() => {
+      // 5% chance de frenar
+      if (Math.random() < 0.05 && frame !== 'idle') {
+         setFrame('idle');
+         return;
       }
-    };
+      
+      // Si está quieto, arrancar de nuevo
+      if (frame === 'idle') {
+         if (Math.random() < 0.2) {
+             setDirection(Math.random() > 0.5 ? 'left' : 'right');
+             setFrame('walk1');
+         }
+         return;
+      }
 
-    window.addEventListener('mousemove', handleMouseMove);
-    window.addEventListener('scroll', handleScroll);
-    
-    return () => {
-      window.removeEventListener('mousemove', handleMouseMove);
-      window.removeEventListener('scroll', handleScroll);
-      if (walkIntervalRef.current) clearInterval(walkIntervalRef.current);
-      clearTimeout(scrollTimeout);
-    };
-  }, [frame]);
+      setFrame(walkFrames[walkCycle]);
+      walkCycle = (walkCycle + 1) % walkFrames.length;
 
-  const currentGrid = FRAMES[frame] || FRAMES.idle;
+      setPosX(prev => {
+        const step = 6;
+        const next = direction === 'right' ? prev + step : prev - step;
+        
+        // Limites de patrullaje
+        if (next > 280) { setDirection('left'); return prev; }
+        if (next < 0) { setDirection('right'); return prev; }
+        return next;
+      });
+
+    }, 180);
+
+    return () => clearInterval(intervalId);
+  }, [isRoaming, frame, direction]);
+
+  const activeBox = FRAMES[frame] || FRAMES.idle;
 
   return (
+    <div className="relative h-[55px] w-[350px] ml-4 hidden sm:block pointer-events-none">
+      {/* Contenedor en Movimiento */}
       <div 
-        ref={containerRef}
-        className="relative group cursor-pointer ml-4 hidden sm:block select-none"
-        onMouseEnter={() => setIsHovered(true)}
-        onMouseLeave={() => setIsHovered(false)}
-        onClick={() => {
-           setFrame('shoot');
-           setTimeout(() => setFrame('idle'), 1000);
-        }}
+         className="absolute bottom-0 transition-all duration-200 ease-linear pointer-events-auto cursor-crosshair group"
+         style={{ 
+            left: `${posX}px`,
+            transform: `scaleX(${direction === 'left' ? -1 : 1})`,
+            width: `${activeBox.w * 1.5}px`, // Escala 1.5x
+            height: `${activeBox.h * 1.5}px`
+         }}
+         onClick={() => {
+            setIsRoaming(false);
+            setFrame('shoot');
+            setTimeout(() => { setIsRoaming(true); setFrame('idle'); }, 1200);
+         }}
       >
+        {/* Renderizado de Sprite Sheet */}
         <div 
-           className="w-[64px] h-[64px] items-center justify-center relative transition-transform duration-300 hover:scale-110"
-           style={{ transform: `scaleX(${direction === 'left' ? -1 : 1})` }}
-        >
-            {/* Sombras y Luces */}
-            {frame === 'shoot' && (
-               <div className="absolute top-1/2 -right-6 w-12 h-12 bg-[#ff00aa] rounded-full blur-[20px] opacity-60 animate-pulse mix-blend-screen pointer-events-none"></div>
-            )}
-            
-            {/* Grid Reactivo */}
-            <div className="grid grid-rows-[16] grid-cols-[16] w-full h-full" style={{ gridTemplateColumns: 'repeat(16, 1fr)', gridTemplateRows: 'repeat(16, 1fr)' }}>
-               {currentGrid.map((row, y) => 
-                  row.split('').map((char, x) => (
-                      <div 
-                        key={`${x}-${y}`}
-                        className={`w-full h-full ${char === 'r' ? 'animate-pulse' : ''}`}
-                        style={{ 
-                          backgroundColor: PALETTE[char],
-                          boxShadow: char === 'r' ? '0 0 8px #ff00aa' : 'none'
-                        }}
-                      />
-                  ))
-               )}
-            </div>
-            
-            {/* Suelo decorativo al hacer hover */}
-            <div className={`absolute -bottom-2 left-1/2 -translate-x-1/2 w-8 h-1 bg-black/20 rounded-full blur-sm transition-opacity duration-300 ${isHovered ? 'opacity-100' : 'opacity-50'}`}></div>
-        </div>
+          className="w-full h-full"
+          style={{
+            backgroundImage: "url('/robocop_sheet.png')",
+            backgroundPosition: `-${activeBox.x * 1.5}px -${activeBox.y * 1.5}px`,
+            backgroundSize: `${677 * 1.5}px auto`, // La imagen original medía 677px de ancho, escalado a 1.5x
+            imageRendering: 'pixelated',
+            filter: 'drop-shadow(2px 4px 6px rgba(0,0,0,0.5))'
+          }}
+        />
+        
+        {/* Láser Holográfico en el disparo */}
+        {frame === 'shoot' && (
+          <div className="absolute top-[30%] -right-[150%] w-[150%] h-[4px] bg-[#ff00aa] rounded-full animate-pulse border-y border-white shadow-[0_0_15px_#ff00aa] z-0"></div>
+        )}
       </div>
+      
+      {/* HUD Efecto (Solo se muestra en hover) */}
+      <div className="absolute top-1 left-2 text-[8px] font-mono text-[#00e5ff] opacity-0 group-hover:opacity-100 transition-opacity">
+        SYS.O.C.P: ONLINE
+      </div>
+    </div>
   );
 }
