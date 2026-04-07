@@ -23,6 +23,11 @@ import {
   RefreshCw,
   ImageIcon,
   Minus,
+  Megaphone,
+  BarChart3,
+  LayoutDashboard,
+  Calendar,
+  Users
 } from "lucide-react";
 
 const API_URL = "/api/vps";
@@ -101,6 +106,11 @@ export default function OpenClawDashboard() {
   // Accordion State
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
+  const [mktOpen, setMktOpen] = useState(false);
+
+  // MKT State
+  const [mktData, setMktData] = useState<any>(null);
+  const [mktLoading, setMktLoading] = useState(false);
 
   // ── VPS Health Check ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -146,6 +156,8 @@ export default function OpenClawDashboard() {
     loadPrompt();
     // Cargar skills
     loadSkills();
+    // Cargar stats MKT
+    loadMkt();
   }, []);
 
   const isFirstLoad = useRef(true);
@@ -204,6 +216,16 @@ export default function OpenClawDashboard() {
       if (data.status === "success") setSkills(data.data);
     } catch { /* ignore */ }
     setSkillsLoading(false);
+  };
+
+  const loadMkt = async () => {
+    setMktLoading(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/mkt/stats`, { headers: HEADERS });
+      const data = await res.json();
+      if (data.status === "success" && data.data) setMktData(data.data);
+    } catch { /* ignore */ }
+    setMktLoading(false);
   };
 
   const addChannel = () => {
@@ -825,6 +847,123 @@ export default function OpenClawDashboard() {
           )}
         </section>
         </div>{/* end 50/50 grid */}
+
+        {/* ── Agente MKT Panel ── */}
+        <section className="bg-[#0c0c0c] border border-white/5 rounded-3xl overflow-hidden shadow-2xl flex flex-col mb-10">
+          <div className="px-6 py-5 border-b border-white/5 bg-black/30 flex items-center justify-between cursor-pointer hover:bg-white/[0.02] transition-colors" onClick={() => setMktOpen(!mktOpen)}>
+            <div className="flex items-center gap-3">
+              <button className="p-1 hover:bg-white/10 rounded-md text-slate-400 transition-colors">
+                {mktOpen ? <Minus size={16} /> : <Plus size={16} />}
+              </button>
+              <div>
+                <h2 className="text-white font-bold text-base flex items-center gap-2">
+                  <Megaphone size={18} className="text-[#ff00aa]" /> Agente MKT
+                </h2>
+                <p className="text-xs text-slate-500 mt-1">Automatización de prospección en grupos y muro de Facebook</p>
+              </div>
+            </div>
+            <button
+              onClick={(e) => { e.stopPropagation(); loadMkt(); }}
+              disabled={mktLoading}
+              className="flex items-center gap-1.5 px-3 py-1.5 bg-white/5 hover:bg-white/10 border border-white/10 text-slate-400 rounded-lg text-xs font-bold transition-all"
+            >
+              <RefreshCw size={13} className={mktLoading ? "animate-spin" : ""} />
+              Recargar
+            </button>
+          </div>
+          {mktOpen && (
+            <div className="p-5 flex flex-col gap-6">
+              {mktLoading && !mktData ? (
+                <div className="flex items-center justify-center h-20 text-slate-600 gap-2"><Loader2 size={16} className="animate-spin" /><span className="text-sm">Cargando base de datos MKT...</span></div>
+              ) : !mktData ? (
+                <div className="flex items-center justify-center h-20 text-slate-600 text-sm">Sin configuración de base MKT activa.</div>
+              ) : (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="p-4 rounded-2xl bg-black/30 border border-white/5 flex items-center gap-4">
+                      <div className="p-3 justify-center items-center flex rounded-full bg-[#ff00aa]/10 text-[#ff00aa] border border-[#ff00aa]/20"><Calendar size={20}/></div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Día Planificado</p>
+                        <h3 className="text-lg font-bold text-white mt-0.5">{mktData.todayDate || "Inactivo"}</h3>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-black/30 border border-white/5 flex items-center gap-4">
+                      <div className="p-3 justify-center items-center flex rounded-full bg-[#00e5ff]/10 text-[#00e5ff] border border-[#00e5ff]/20"><Users size={20}/></div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Posteos Locales</p>
+                        <h3 className="text-lg font-bold text-white mt-0.5">{mktData.metrics?.totalGroupSharesSuccess || 0} / {mktData.todaySchedule?.length || 0}</h3>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-black/30 border border-white/5 flex items-center gap-4">
+                      <div className="p-3 justify-center items-center flex rounded-full bg-[#00ffaa]/10 text-[#00ffaa] border border-[#00ffaa]/20"><BarChart3 size={20}/></div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Likes Muro</p>
+                        <h3 className="text-lg font-bold text-white mt-0.5">{mktData.metrics?.wallLikes || 0}</h3>
+                      </div>
+                    </div>
+                    <div className="p-4 rounded-2xl bg-black/30 border border-white/5 flex items-center gap-4">
+                      <div className="p-3 justify-center items-center flex rounded-full bg-[#ffc800]/10 text-[#ffc800] border border-[#ffc800]/20"><MessageCircle size={20}/></div>
+                      <div>
+                        <p className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">Comentarios Muro</p>
+                        <h3 className="text-lg font-bold text-white mt-0.5">{mktData.metrics?.wallComments || 0}</h3>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
+                    {/* Copy Activo */}
+                    <div className="lg:col-span-1 rounded-2xl bg-white/[0.02] border border-white/5 p-5">
+                      <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2 mb-4">
+                        <LayoutDashboard size={16} className="text-slate-400"/> Copy de la Campaña
+                      </h4>
+                      <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-sm text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
+                        <div className="flex items-center gap-3 mb-4">
+                          <div className="w-8 h-8 rounded-full bg-slate-800"></div>
+                          <div>
+                            <span className="font-bold text-white text-xs block">Candidatic</span>
+                            <span className="text-[10px] text-slate-500">Preview del grupo</span>
+                          </div>
+                        </div>
+                        {mktData.activeCampaign?.groupText || "Sin campaña guardada."}
+                      </div>
+                    </div>
+
+                    {/* Tabla de Logs */}
+                    <div className="lg:col-span-2 rounded-2xl bg-white/[0.02] border border-white/5 p-5 flex flex-col">
+                      <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2 mb-4">
+                        <Activity size={16} className="text-slate-400"/> Historial del Día ({mktData.todaySchedule?.filter((t:any) => t.done).length || 0} completados)
+                      </h4>
+                      <div className="flex-1 bg-black/40 border border-white/5 rounded-xl overflow-y-auto max-h-[300px]">
+                        <table className="w-full text-left text-sm whitespace-nowrap">
+                          <thead className="bg-black/60 sticky top-0 border-b border-white/5">
+                            <tr>
+                              <th className="px-4 py-3 text-xs font-bold text-slate-500">Status</th>
+                              <th className="px-4 py-3 text-xs font-bold text-slate-500">Hora</th>
+                              <th className="px-4 py-3 text-xs font-bold text-slate-500">Grupo</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-white/5 text-slate-300">
+                            {mktData.todaySchedule?.length > 0 ? mktData.todaySchedule.map((task:any, i:number) => (
+                              <tr key={i} className="hover:bg-white/[0.02] transition-colors">
+                                <td className="px-4 py-3">
+                                  {task.done ? (task.error ? <XCircle size={14} className="text-rose-500" /> : <CheckCircle2 size={14} className="text-emerald-500" />) : <span className="text-slate-600 inline-block w-2 h-2 rounded-full bg-slate-700"/>}
+                                </td>
+                                <td className="px-4 py-3 font-mono text-xs">{String(task.hour).padStart(2,'0')}:{String(task.minute).padStart(2,'0')}</td>
+                                <td className="px-4 py-3 text-xs truncate max-w-[200px]">{task.groupName}</td>
+                              </tr>
+                            )) : (
+                              <tr><td colSpan={3} className="text-center py-6 text-slate-600 text-xs">Aún no se ha calculado el schedule diario.</td></tr>
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
+        </section>
 
       </div>
     </div>
