@@ -113,6 +113,7 @@ export default function OpenClawDashboard() {
   const [mktLoading, setMktLoading] = useState(false);
   const [isEditingMkt, setIsEditingMkt] = useState(false);
   const [editCampaignText, setEditCampaignText] = useState("");
+  const [editInstructionsText, setEditInstructionsText] = useState("");
   const [mktSaving, setMktSaving] = useState(false);
 
   // ── VPS Health Check ─────────────────────────────────────────────────────
@@ -229,6 +230,7 @@ export default function OpenClawDashboard() {
       if (data.status === "success" && data.data) {
         setMktData(data.data);
         setEditCampaignText(data.data.activeCampaign?.groupText || "");
+        setEditInstructionsText(data.data.instructions || "");
       }
     } catch { /* ignore */ }
     setMktLoading(false);
@@ -240,7 +242,7 @@ export default function OpenClawDashboard() {
       const res = await fetch(`${API_URL}/api/admin/mkt/config`, {
         method: "POST",
         headers: HEADERS,
-        body: JSON.stringify({ groupText: editCampaignText })
+        body: JSON.stringify({ groupText: editCampaignText, instructions: editInstructionsText })
       });
       const data = await res.json();
       if (data.status === "success" && data.data) {
@@ -953,27 +955,49 @@ export default function OpenClawDashboard() {
                       </div>
 
                       {isEditingMkt ? (
-                        <div className="mb-4">
-                          <textarea 
-                            value={editCampaignText}
-                            onChange={(e) => setEditCampaignText(e.target.value)}
-                            rows={8}
-                            className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-slate-300 outline-none focus:border-[#ff00aa]/40 resize-y"
-                            placeholder="Escribe el texto de la publicación y pega el enlace aquí..."
-                          />
-                          <p className="text-[10px] text-slate-500 mt-2">Menciona un enlace válido de Facebook para generar la vista previa.</p>
+                        <div className="mb-4 flex flex-col gap-4">
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-500 mb-2 block">Instrucciones / Comportamiento</label>
+                            <textarea 
+                              value={editInstructionsText}
+                              onChange={(e) => setEditInstructionsText(e.target.value)}
+                              rows={4}
+                              className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-slate-300 outline-none focus:border-[#ff00aa]/40 resize-y font-mono"
+                              placeholder="Ej: Publica 3 por hora, salta si ves error."
+                            />
+                          </div>
+                          <div>
+                            <label className="text-[10px] uppercase font-bold text-slate-500 mb-2 block">Copy de Publicación + Enlace Facebook</label>
+                            <textarea 
+                              value={editCampaignText}
+                              onChange={(e) => setEditCampaignText(e.target.value)}
+                              rows={6}
+                              className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-slate-300 outline-none focus:border-[#ff00aa]/40 resize-y"
+                              placeholder="Escribe el texto de la publicación y pega el enlace aquí..."
+                            />
+                            <p className="text-[10px] text-slate-500 mt-2">Menciona un enlace válido de Facebook para generar la vista previa.</p>
+                          </div>
                         </div>
                       ) : (
-                        <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-sm text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
-                          <div className="flex items-center gap-3 mb-4">
-                            <div className="w-8 h-8 rounded-full bg-slate-800"></div>
-                            <div>
-                              <span className="font-bold text-white text-xs block">Candidatic</span>
-                              <span className="text-[10px] text-slate-500">Preview del grupo</span>
+                        <div className="flex flex-col gap-4">
+                          {/* Instrucciones display */}
+                          {mktData.instructions && (
+                            <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-xs text-slate-400 whitespace-pre-wrap font-mono uppercase leading-relaxed">
+                              <span className="text-[#ff00aa] font-bold block mb-1">PROMPT ACTIVO:</span>
+                              {mktData.instructions}
                             </div>
-                          </div>
-                          {(() => {
-                            const text = mktData.activeCampaign?.groupText || "Sin campaña guardada.";
+                          )}
+
+                          <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-sm text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
+                            <div className="flex items-center gap-3 mb-4">
+                              <div className="w-8 h-8 rounded-full bg-slate-800"></div>
+                              <div>
+                                <span className="font-bold text-white text-xs block">Candidatic</span>
+                                <span className="text-[10px] text-slate-500">Preview del grupo</span>
+                              </div>
+                            </div>
+                            {(() => {
+                              const text = mktData.activeCampaign?.groupText || "Sin campaña guardada.";
                             const urlMatch = text.match(/https?:\/\/[^\s]+/);
                             const url = urlMatch ? urlMatch[0] : null;
                             const plainText = text.replace(url || '', '').trim();
@@ -998,8 +1022,9 @@ export default function OpenClawDashboard() {
                             );
                           })()}
                         </div>
-                      )}
-                    </div>
+                      </div>
+                    )}
+                  </div>
 
                     {/* Tabla de Logs */}
                     <div className="lg:col-span-2 rounded-2xl bg-white/[0.02] border border-white/5 p-5 flex flex-col">
