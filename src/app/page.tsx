@@ -111,6 +111,9 @@ export default function OpenClawDashboard() {
   // MKT State
   const [mktData, setMktData] = useState<any>(null);
   const [mktLoading, setMktLoading] = useState(false);
+  const [isEditingMkt, setIsEditingMkt] = useState(false);
+  const [editCampaignText, setEditCampaignText] = useState("");
+  const [mktSaving, setMktSaving] = useState(false);
 
   // ── VPS Health Check ─────────────────────────────────────────────────────
   useEffect(() => {
@@ -223,9 +226,29 @@ export default function OpenClawDashboard() {
     try {
       const res = await fetch(`${API_URL}/api/admin/mkt/stats`, { headers: HEADERS });
       const data = await res.json();
-      if (data.status === "success" && data.data) setMktData(data.data);
+      if (data.status === "success" && data.data) {
+        setMktData(data.data);
+        setEditCampaignText(data.data.activeCampaign?.groupText || "");
+      }
     } catch { /* ignore */ }
     setMktLoading(false);
+  };
+
+  const saveMktConfig = async () => {
+    setMktSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/mkt/config`, {
+        method: "POST",
+        headers: HEADERS,
+        body: JSON.stringify({ groupText: editCampaignText })
+      });
+      const data = await res.json();
+      if (data.status === "success" && data.data) {
+        setMktData(data.data);
+        setIsEditingMkt(false);
+      }
+    } catch { /* ignore */ }
+    setMktSaving(false);
   };
 
   const addChannel = () => {
@@ -913,44 +936,69 @@ export default function OpenClawDashboard() {
                   <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-2">
                     {/* Copy Activo */}
                     <div className="lg:col-span-1 rounded-2xl bg-white/[0.02] border border-white/5 p-5">
-                      <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2 mb-4">
-                        <LayoutDashboard size={16} className="text-slate-400"/> Copy de la Campaña
-                      </h4>
-                      <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-sm text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
-                        <div className="flex items-center gap-3 mb-4">
-                          <div className="w-8 h-8 rounded-full bg-slate-800"></div>
-                          <div>
-                            <span className="font-bold text-white text-xs block">Candidatic</span>
-                            <span className="text-[10px] text-slate-500">Preview del grupo</span>
-                          </div>
-                        </div>
-                        {(() => {
-                          const text = mktData.activeCampaign?.groupText || "Sin campaña guardada.";
-                          const urlMatch = text.match(/https?:\/\/[^\s]+/);
-                          const url = urlMatch ? urlMatch[0] : null;
-                          const plainText = text.replace(url || '', '').trim();
-
-                          return (
-                            <div className="flex flex-col gap-3">
-                              {plainText && <p className="whitespace-pre-wrap">{plainText}</p>}
-                              {url && url.includes('facebook') && (
-                                <div className="w-full bg-white rounded-lg overflow-hidden mt-2 flex justify-center">
-                                  <iframe 
-                                    src={`https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}&show_text=true&width=350`}
-                                    width="350" 
-                                    height="450" 
-                                    style={{ border: "none", overflow: "hidden" }} 
-                                    scrolling="yes" 
-                                    frameBorder="0" 
-                                    allowFullScreen={true} 
-                                    allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
-                                  ></iframe>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
+                      <div className="flex items-center justify-between mb-4">
+                        <h4 className="text-sm font-bold text-slate-300 flex items-center gap-2">
+                          <LayoutDashboard size={16} className="text-slate-400"/> Instrucciones y Copy
+                        </h4>
+                        <button 
+                          onClick={() => {
+                            if (isEditingMkt) saveMktConfig();
+                            else setIsEditingMkt(true);
+                          }}
+                          disabled={mktSaving}
+                          className="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs rounded-md transition-colors"
+                        >
+                          {mktSaving ? "Guardando..." : isEditingMkt ? "Guardar" : "Editar"}
+                        </button>
                       </div>
+
+                      {isEditingMkt ? (
+                        <div className="mb-4">
+                          <textarea 
+                            value={editCampaignText}
+                            onChange={(e) => setEditCampaignText(e.target.value)}
+                            rows={8}
+                            className="w-full bg-black/50 border border-white/10 rounded-xl p-3 text-sm text-slate-300 outline-none focus:border-[#ff00aa]/40 resize-y"
+                            placeholder="Escribe el texto de la publicación y pega el enlace aquí..."
+                          />
+                          <p className="text-[10px] text-slate-500 mt-2">Menciona un enlace válido de Facebook para generar la vista previa.</p>
+                        </div>
+                      ) : (
+                        <div className="p-4 bg-black/40 rounded-xl border border-white/5 text-sm text-slate-300 whitespace-pre-wrap font-sans leading-relaxed">
+                          <div className="flex items-center gap-3 mb-4">
+                            <div className="w-8 h-8 rounded-full bg-slate-800"></div>
+                            <div>
+                              <span className="font-bold text-white text-xs block">Candidatic</span>
+                              <span className="text-[10px] text-slate-500">Preview del grupo</span>
+                            </div>
+                          </div>
+                          {(() => {
+                            const text = mktData.activeCampaign?.groupText || "Sin campaña guardada.";
+                            const urlMatch = text.match(/https?:\/\/[^\s]+/);
+                            const url = urlMatch ? urlMatch[0] : null;
+                            const plainText = text.replace(url || '', '').trim();
+
+                            return (
+                              <div className="flex flex-col gap-3">
+                                {plainText && <p className="whitespace-pre-wrap">{plainText}</p>}
+                                {url && url.includes('facebook') && (
+                                  <div className="w-full bg-white rounded-lg overflow-hidden mt-2 flex justify-center" style={{ minHeight: "200px" }}>
+                                    <iframe 
+                                      src={`https://www.facebook.com/plugins/post.php?href=${encodeURIComponent(url)}&show_text=true&width=auto`}
+                                      width="100%" 
+                                      style={{ border: "none", overflow: "hidden", minHeight: "400px" }} 
+                                      scrolling="no" 
+                                      frameBorder="0" 
+                                      allowFullScreen={true} 
+                                      allow="autoplay; clipboard-write; encrypted-media; picture-in-picture; web-share"
+                                    ></iframe>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })()}
+                        </div>
+                      )}
                     </div>
 
                     {/* Tabla de Logs */}
