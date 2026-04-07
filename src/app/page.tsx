@@ -27,7 +27,8 @@ import {
   BarChart3,
   LayoutDashboard,
   Calendar,
-  Users
+  Users,
+  ExternalLink
 } from "lucide-react";
 
 const API_URL = "/api/vps";
@@ -1047,7 +1048,22 @@ export default function OpenClawDashboard() {
                                   {task.done ? (task.error ? <XCircle size={14} className="text-rose-500" /> : <CheckCircle2 size={14} className="text-emerald-500" />) : <span className="text-slate-600 inline-block w-2 h-2 rounded-full bg-slate-700"/>}
                                 </td>
                                 <td className="px-4 py-3 font-mono text-xs">{String((task.hour - 6 + 24) % 24).padStart(2,'0')}:{String(task.minute).padStart(2,'0')}</td>
-                                <td className="px-4 py-3 text-xs truncate max-w-[200px]">{task.groupName}</td>
+                                <td className="px-4 py-3 text-xs w-full">
+                                  <div className="flex items-center justify-between gap-2 max-w-[300px]">
+                                    <span className="truncate" title={task.groupName}>{task.groupName}</span>
+                                    {task.groupId && (
+                                      <a 
+                                        href={`https://www.facebook.com/groups/${task.groupId}/?sorting_setting=CHRONOLOGICAL`}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="text-slate-500 hover:text-[#00e5ff] transition-colors p-1"
+                                        title="Abrir Feed del Grupo"
+                                      >
+                                        <ExternalLink size={13} />
+                                      </a>
+                                    )}
+                                  </div>
+                                </td>
                               </tr>
                             )) : (
                               <tr><td colSpan={3} className="text-center py-6 text-slate-600 text-xs">Aún no se ha calculado el schedule diario.</td></tr>
