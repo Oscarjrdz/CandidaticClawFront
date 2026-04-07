@@ -30,6 +30,7 @@ import {
   Users,
   ExternalLink
 } from "lucide-react";
+import RobocopMascot from "@/components/RobocopMascot";
 
 const API_URL = "/api/vps";
 const API_KEY = process.env.NEXT_PUBLIC_VPS_API_KEY || "super_secret_key_123";
@@ -107,7 +108,7 @@ export default function OpenClawDashboard() {
   // Accordion State
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [promptOpen, setPromptOpen] = useState(false);
-  const [mktOpen, setMktOpen] = useState(false);
+  const [mktOpen, setMktOpen] = useState(true);
 
   // MKT State
   const [mktData, setMktData] = useState<any>(null);
@@ -884,6 +885,7 @@ export default function OpenClawDashboard() {
               <div>
                 <h2 className="text-white font-bold text-base flex items-center gap-2">
                   <Megaphone size={18} className="text-[#ff00aa]" /> Agente MKT
+                  <RobocopMascot successCount={mktData?.metrics?.totalGroupSharesSuccess || 0} />
                 </h2>
                 <p className="text-xs text-slate-500 mt-1">Automatización de prospección en grupos y muro de Facebook</p>
               </div>
